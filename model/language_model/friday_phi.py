@@ -32,12 +32,19 @@ class FridayPhiConfig(PhiConfig):
         self.cfg_vision_adapter = {}
         self.cfg_special_tokens = {}
 
-class FridayPhiModel(FridayMetaModel, PhiModel):
+class FridayPhiModel(PhiModel):
     config_class = FridayPhiConfig
     
-    def __init__(self, config: PhiConfig):
-        PhiModel.__init__(self, config)
-        FridayMetaModel.__init__(self, config.cfg_vision_tower, config.cfg_vision_adapter)
+    def __init__(self, config: FridayPhiConfig):
+        super().__init__(config)
+
+        self.meta_model = FridayMetaModel(
+            cfg_vision_tower=config.cfg_vision_tower,
+            cfg_vision_adapter=config.cfg_vision_adapter
+        )
+    
+    def encode_images(self, imgs: List[torch.Tensor]) -> torch.Tensor:
+        return self.meta_model.encode_images(imgs)
 
 class FridayPhiForCausalLM(PhiForCausalLM):
     config_class = FridayPhiConfig
@@ -109,37 +116,51 @@ class FridayPhiForCausalLM(PhiForCausalLM):
             input_ids: torch.LongTensor = None,
             attention_mask: Optional[torch.Tensor] = None,
             position_ids: Optional[torch.LongTensor] = None,
-            past_key_values: Optional[List[torch.FloatTensor]] = None,
+            past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
             inputs_embeds: Optional[torch.FloatTensor] = None,
             labels: Optional[torch.LongTensor] = None,
+            use_cache: Optional[bool] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+            cache_position: Optional[torch.LongTensor] = None,
+            logits_to_keep: Union[int, torch.Tensor] = 0,
             images: Optional[torch.FloatTensor] = None,
-            **kwargs
+            **kwargs: Unpack[KwargsForCausalLM],
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        if inputs_embeds is None:
+        if inputs_embeds is None and images is not None:
+            print("Preparing multimodal inputs...")
             (
-                input_ids,
-                position_ids,
-                attention_mask,
-                past_key_values,
+                # input_ids,
+                # position_ids,
+                # attention_mask,
+                # past_key_values,
                 inputs_embeds,
                 labels
             ) = self.prepare_inputs_labels_for_multimodal(
-                input_ids,
-                position_ids,
-                attention_mask,
-                past_key_values,
-                labels,
-                images
+                input_ids=input_ids,
+                # position_ids,
+                # attention_mask,
+                # past_key_values,
+                labels=labels,
+                images=images
             )
 
-        return super().forward(
+        return PhiForCausalLM.forward(
+            self,
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             labels=labels,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            cache_position=cache_position,
+            logits_to_keep=logits_to_keep,
             **kwargs
         )
 
@@ -159,7 +180,7 @@ def build_tokenizer(base_model_id: str) -> Tuple[AutoTokenizer, dict]:
     return tok, specials
 
 
-def build_friday_phi(config: dict, base_lm: str = "microsoft/phi-4-mini-instruct") -> FridayPhiForCausalLM:
+def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct") -> FridayPhiForCausalLM:
     tok, special_tokens = build_tokenizer(base_lm)
 
     base_cfg = FridayPhiConfig.from_pretrained(base_lm)
@@ -167,8 +188,16 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/phi-4-mini-instruct
     base_cfg.cfg_vision_adapter = config.get("vision_adapter", {})
     base_cfg.cfg_special_tokens = special_tokens
 
-    model = FridayPhiForCausalLM(base_cfg)
-    model.resize_token_embeddings(len(tok))
+    model = FridayPhiForCausalLM.from_pretrained(
+        base_lm, 
+        low_cpu_mem_usage=True,
+        config=base_cfg, 
+        device_map="auto",
+        torch_dtype="auto",
+        trust_remote_code=True,
+    )
+    
+    # model.resize_token_embeddings(len(tok))
 
     return model, tok
 

@@ -827,12 +827,12 @@ class Phi3ForCausalLM(Phi3PreTrainedModel, GenerationMixin):
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = Phi3Model(config)
-        self.vocab_size = config.vocab_size
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        # self.model = Phi3Model(config)
+        # self.vocab_size = config.vocab_size
+        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        # Initialize weights and apply final processing
-        self.post_init()
+        # # Initialize weights and apply final processing
+        # self.post_init()
 
     def get_input_embeddings(self):
         return self.model.embed_tokens

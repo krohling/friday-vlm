@@ -54,7 +54,7 @@ def pad_and_stack(img_list):
 class FridayMetaModel(nn.Module):
 
     def __init__(self, cfg_vision_tower: dict, cfg_vision_adapter: dict):
-        # super().__init__()
+        super().__init__()
         self.vision_tower = SiglipVisionTowerS2(**cfg_vision_tower)
         self.projector    = MLPAdapter(**cfg_vision_adapter)
 

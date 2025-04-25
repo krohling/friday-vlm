@@ -23,7 +23,11 @@ config = EasyDict({
 })
 
 model, tokenizer = build_friday_phi(config)
+ 
+# from transformers import AutoTokenizer, Phi3ForCausalLM
 
+# model = Phi3ForCausalLM.from_pretrained("meta-phi3/Phi3-2-7b-hf")
+# tokenizer = AutoTokenizer.from_pretrained("meta-phi3/Phi3-2-7b-hf")
 
 prompt = "Hey, are you conscious? Can you talk to me?"
 inputs = tokenizer(prompt, return_tensors="pt")
