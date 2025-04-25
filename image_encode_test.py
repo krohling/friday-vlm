@@ -4,6 +4,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 from model.language_model.friday_phi import build_friday_phi
+
+from PIL import Image
  
 torch.random.manual_seed(0)
 
@@ -36,26 +38,19 @@ else:
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 
-
-# prompt = "Hey, are you conscious? Can you talk to me?"
-# inputs = tokenizer(prompt, return_tensors="pt")
-
-# generate_ids = model.generate(inputs.input_ids, max_length=30)
-# result = tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-# print(result)
-
 messages = [
     {"role": "system", "content": "You are a helpful AI assistant."},
-    {"role": "user", "content": "Can you provide ways to eat combinations of bananas and dragonfruits?"},
-    {"role": "assistant", "content": "Sure! Here are some ways to eat bananas and dragonfruits together: 1. Banana and dragonfruit smoothie: Blend bananas and dragonfruits together with some milk and honey. 2. Banana and dragonfruit salad: Mix sliced bananas and dragonfruits together with some lemon juice and honey."},
-    {"role": "user", "content": "What about solving an 2x + 3 = 7 equation?"},
+    {"role": "user", "content": "Describe this image.<image>"},
 ]
+
+
+image = Image.open("cat.jpeg").convert("RGB")
  
 pipe = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
-    images=None
+    images=[image],
 )
  
 generation_args = {

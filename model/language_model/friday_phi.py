@@ -68,47 +68,107 @@ class FridayPhiForCausalLM(PhiForCausalLM):
     def prepare_inputs_labels_for_multimodal(
         self,
         input_ids: torch.LongTensor,
+        position_ids: Optional[torch.LongTensor],
+        attention_mask: Optional[torch.Tensor],
+        past_key_values: Optional[List[torch.FloatTensor]],
         labels: Optional[torch.LongTensor],
         images: Optional[List[torch.Tensor]],
-    ) -> Tuple[torch.Tensor, torch.LongTensor]:
-        if images is None or (input_ids == self.image_token_id).sum() == 0:
-            return self.embed_tokens(input_ids), labels  # type: ignore
+    ) -> Tuple[Optional[torch.Tensor], Optional[torch.LongTensor], Optional[torch.Tensor], Optional[List[torch.FloatTensor]], torch.Tensor, Optional[torch.Tensor]]:
+        """Hybrid of Bunny (robust) + Friday (<img_start>/<img_end>)."""
 
-        B = input_ids.size(0)
-        assert len(images) == B, "#images must equal batch"
-        img_embeds = self.model.encode_images(images)  # (B,N,3072)
+        # ─────────────────── early return (no image / streaming step) ───────────────────
+        vision_tower = self.model.get_vision_tower()
+        if vision_tower is None or images is None or input_ids.shape[1] == 1:
+            if past_key_values is not None and images is not None and input_ids.shape[1] == 1:
+                tgt = past_key_values[-1][-1].shape[-2] + 1
+                attention_mask = torch.cat(
+                    [attention_mask, torch.ones((attention_mask.size(0), tgt - attention_mask.size(1)), dtype=attention_mask.dtype, device=attention_mask.device)],
+                    dim=1,
+                )
+                position_ids = attention_mask.sum(dim=1).unsqueeze(-1) - 1
+            return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
-        all_embeds, all_labels = [], []
-        for i in range(B):
-            ids = input_ids[i]
-            img_tokens = img_embeds[i]
-            parts, lbls = [], []
-            ptr = 0
-            for pos in (ids == self.image_token_id).nonzero(as_tuple=True)[0]:
-                # text before
-                txt_ids = ids[ptr:pos]
-                parts.append(self.embed_tokens(txt_ids))  # type: ignore
-                lbls.append(txt_ids)
-                # image block
+        # ─────────────────────────── visual features (B, N, D) ───────────────────────────
+        if isinstance(images, list) or images.ndim == 5:
+            concat = torch.cat(images, dim=0)
+            feats = self.encode_images(concat)
+            splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
+            image_features = [x.flatten(0, 1).to(self.device) for x in splits]
+        else:
+            image_features = self.encode_images(images).to(self.device)
+
+        # ───────────────────────────── pad handling prelims ──────────────────────────────
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
+        else:
+            attention_mask = attention_mask.bool()
+        if position_ids is None:
+            position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
+        if labels is None:
+            labels = torch.full_like(input_ids, IGNORE)
+
+        # strip current padding for efficiency
+        input_ids_nopad = [ids[mask] for ids, mask in zip(input_ids, attention_mask)]
+        labels_nopad    = [lab[mask] for lab, mask in zip(labels, attention_mask)]
+
+        # repetition‑penalty safety
+        input_ids[input_ids == self.image_token_id] = 0
+
+        # ───────────────────────────── splice per‑sample ────────────────────────────────
+        embeds_list, labels_list = [], []
+        img_ptr = 0
+        for ids, labs in zip(input_ids_nopad, labels_nopad):
+            positions = (ids == self.image_token_id).nonzero(as_tuple=True)[0]
+            parts, lbl_parts = [], []
+            cursor = 0
+            for pos in positions:
+                txt = ids[cursor:pos]
+                parts.append(self.embed_tokens(txt))
+                lbl_parts.append(txt)
+
+                # start token
                 parts.append(self.embed_tokens(ids.new_tensor([self.start_id])))
-                parts.append(img_tokens)
-                parts.append(self.embed_tokens(ids.new_tensor([self.end_id])))
-                lbls.append(ids.new_tensor([-100] * (1 + img_tokens.size(0) + 1)))
-                ptr = pos + 1
-            # tail text
-            txt_ids = ids[ptr:]
-            parts.append(self.embed_tokens(txt_ids))
-            lbls.append(txt_ids)
-            all_embeds.append(torch.cat(parts))
-            all_labels.append(torch.cat(lbls))
+                lbl_parts.append(ids.new_tensor([IGNORE]))
 
-        # pad to same length
-        L = max(x.size(0) for x in all_embeds)
-        pad_emb = torch.zeros(L, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
-        pad_lab = torch.full((L,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
-        embeds = torch.stack([torch.cat([e, pad_emb[e.size(0):]]) for e in all_embeds])
-        labels = torch.stack([torch.cat([l, pad_lab[l.size(0):]]) for l in all_labels]) if labels is not None else None
-        return embeds, labels
+                # visual tokens
+                vis = image_features[img_ptr]
+                img_ptr += 1
+                parts.append(vis)
+                lbl_parts.append(ids.new_tensor([IGNORE] * vis.size(0)))
+
+                # end token
+                parts.append(self.embed_tokens(ids.new_tensor([self.end_id])))
+                lbl_parts.append(ids.new_tensor([IGNORE]))
+                cursor = pos + 1
+            # tail text
+            tail = ids[cursor:]
+            parts.append(self.embed_tokens(tail))
+            lbl_parts.append(tail)
+
+            embeds_list.append(torch.cat(parts))
+            labels_list.append(torch.cat(lbl_parts))
+
+        # ───────────────────── truncate then pad back to rectangle ──────────────────────
+        max_ctx = getattr(self.config, 'tokenizer_model_max_length', None)
+        if max_ctx is not None:
+            embeds_list = [e[:max_ctx] for e in embeds_list]
+            labels_list = [l[:max_ctx] for l in labels_list]
+
+        max_len = max(e.size(0) for e in embeds_list)
+        bs = len(embeds_list)
+        emb_pad = torch.zeros(max_len, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
+        lab_pad = torch.full((max_len,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
+
+        new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list])
+        new_labels       = torch.stack([torch.cat([l, lab_pad[l.size(0):]]) for l in labels_list]) if labels is not None else None
+
+        # rebuild mask & pos (right‑padding only)
+        attention_mask = torch.arange(max_len, device=input_ids.device).expand(bs, -1) < torch.tensor([e.size(0) for e in embeds_list], device=input_ids.device).unsqueeze(1)
+        position_ids   = torch.arange(max_len, device=input_ids.device).expand(bs, -1)
+
+        if labels is None:
+            new_labels = None
+        return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
     # ------------------------------------------------------------------
     def forward(
@@ -132,19 +192,19 @@ class FridayPhiForCausalLM(PhiForCausalLM):
         if inputs_embeds is None and images is not None:
             print("Preparing multimodal inputs...")
             (
-                # input_ids,
-                # position_ids,
-                # attention_mask,
-                # past_key_values,
+                input_ids,
+                position_ids,
+                attention_mask,
+                past_key_values,
                 inputs_embeds,
                 labels
             ) = self.prepare_inputs_labels_for_multimodal(
-                input_ids=input_ids,
-                # position_ids,
-                # attention_mask,
-                # past_key_values,
-                labels=labels,
-                images=images
+                input_ids,
+                position_ids,
+                attention_mask,
+                past_key_values,
+                labels,
+                images
             )
 
         return PhiForCausalLM.forward(
