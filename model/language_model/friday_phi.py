@@ -43,6 +43,9 @@ class FridayPhiModel(PhiModel):
             cfg_vision_adapter=config.cfg_vision_adapter
         )
     
+    def get_vision_tower(self) -> Optional[nn.Module]:
+        return self.meta_model.get_vision_tower()
+    
     def encode_images(self, imgs: List[torch.Tensor]) -> torch.Tensor:
         return self.meta_model.encode_images(imgs)
 
@@ -90,10 +93,10 @@ class FridayPhiForCausalLM(PhiForCausalLM):
 
         # ─────────────────────────── visual features (B, N, D) ───────────────────────────
         if isinstance(images, list) or images.ndim == 5:
-            concat = torch.cat(images, dim=0)
-            feats = self.encode_images(concat)
-            splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
-            image_features = [x.flatten(0, 1).to(self.device) for x in splits]
+            # concat = torch.cat(images, dim=0)
+            image_features = self.encode_images(images).to(self.device)
+            # splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
+            # image_features = [x.flatten(0, 1).to(self.device) for x in splits]
         else:
             image_features = self.encode_images(images).to(self.device)
 
@@ -123,11 +126,11 @@ class FridayPhiForCausalLM(PhiForCausalLM):
             cursor = 0
             for pos in positions:
                 txt = ids[cursor:pos]
-                parts.append(self.embed_tokens(txt))
+                parts.append(self.model.embed_tokens(txt))
                 lbl_parts.append(txt)
 
                 # start token
-                parts.append(self.embed_tokens(ids.new_tensor([self.start_id])))
+                parts.append(self.model.embed_tokens(ids.new_tensor([self.start_id])))
                 lbl_parts.append(ids.new_tensor([IGNORE]))
 
                 # visual tokens
@@ -137,12 +140,12 @@ class FridayPhiForCausalLM(PhiForCausalLM):
                 lbl_parts.append(ids.new_tensor([IGNORE] * vis.size(0)))
 
                 # end token
-                parts.append(self.embed_tokens(ids.new_tensor([self.end_id])))
+                parts.append(self.model.embed_tokens(ids.new_tensor([self.end_id])))
                 lbl_parts.append(ids.new_tensor([IGNORE]))
                 cursor = pos + 1
             # tail text
             tail = ids[cursor:]
-            parts.append(self.embed_tokens(tail))
+            parts.append(self.model.embed_tokens(tail))
             lbl_parts.append(tail)
 
             embeds_list.append(torch.cat(parts))
@@ -159,7 +162,7 @@ class FridayPhiForCausalLM(PhiForCausalLM):
         emb_pad = torch.zeros(max_len, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
         lab_pad = torch.full((max_len,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
 
-        new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list])
+        new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list]).to(dtype=self.dtype)
         new_labels       = torch.stack([torch.cat([l, lab_pad[l.size(0):]]) for l in labels_list]) if labels is not None else None
 
         # rebuild mask & pos (right‑padding only)
@@ -206,6 +209,8 @@ class FridayPhiForCausalLM(PhiForCausalLM):
                 labels,
                 images
             )
+            # print(f"inputs_embeds.shape: {inputs_embeds.shape}")
+            
 
         return PhiForCausalLM.forward(
             self,
@@ -256,7 +261,7 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
         torch_dtype="auto",
         trust_remote_code=True,
     )
-    
+    model.get_model().meta_model.load_model(device=model.device)
     # model.resize_token_embeddings(len(tok))
 
     return model, tok

@@ -20,6 +20,7 @@ class SiglipVisionTower(nn.Module):
             self.cfg_only = SiglipVisionConfig.from_pretrained(self.vision_tower_name)
 
     def load_model(self):
+        print("***load_model")
         if self.is_loaded:
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
@@ -78,7 +79,7 @@ class SiglipVisionTower(nn.Module):
 
 
 class SiglipVisionTowerS2(SiglipVisionTower):
-    def __init__(self, vision_tower, s2_scales, delay_load=False):
+    def __init__(self, vision_tower, s2_scales, delay_load=True):
         self.s2_scales = list(map(int, s2_scales.split(',')))
         self.s2_scales.sort()
         self.s2_split_size = self.s2_scales[0]
@@ -92,12 +93,15 @@ class SiglipVisionTowerS2(SiglipVisionTower):
             self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
             self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
 
-    def load_model(self):
+    def load_model(self, device_map='cpu'):
         if self.is_loaded:
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(self.vision_tower_name)
+        self.vision_tower = SiglipVisionModel.from_pretrained(
+            self.vision_tower_name,
+            device_map=device_map,
+        )
         self.vision_tower.requires_grad_(False)
 
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size

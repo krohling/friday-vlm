@@ -1,11 +1,10 @@
-from easydict import EasyDict
-
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-from model.language_model.friday_phi import build_friday_phi
-
+from easydict import EasyDict
 from PIL import Image
+
+from model import build_friday_phi
  
 torch.random.manual_seed(0)
 
