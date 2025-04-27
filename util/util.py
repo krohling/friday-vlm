@@ -15,10 +15,6 @@ def pad_and_stack(img_list):
         Shape (B, C, H_max, W_max) on the same device / dtype as the first image.
     """
 
-    print("*************")
-    for img in img_list:
-        print(img.shape)
-
     # --- 1. work out the target size ----------------------------------------
     h_max = max(img.shape[1] for img in img_list)
     w_max = max(img.shape[2] for img in img_list)
@@ -41,7 +37,5 @@ def pad_and_stack(img_list):
 
     # --- 3. stack into batch --------------------------------------------------
     batch = torch.stack(padded_imgs, dim=0)
-
-    print(batch.shape)
 
     return batch

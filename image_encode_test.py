@@ -66,112 +66,113 @@ def run_batch(examples, **gen_kw):
 
 
 # PASSES
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Are you conscious?"},
-#         ],
-#         "images": []
-#     }
-# ])
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Are you conscious?"},
+        ],
+        "images": []
+    }
+])
 
-
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Describe this image: <image>"},
-#         ],
-#         "images": [image_1]
-#     }
-# ])
-
-# # OOM
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "What is the difference between this image: <image> and this image: <image>?"},
-#         ],
-#         "images": [image_1, image_2]
-#     }
-# ])
-
-# OOM
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "What is the difference between these two images?<image><image>"},
-#         ],
-#         "images": [image_1, image_2]
-#     }
-# ])
 
 # PASSES
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Describe this image"},
-#         ],
-#         "images": [image_1]
-#     }
-# ])
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "What is in this image: <image>"},
+        ],
+        "images": [image_1]
+    }
+])
+
+# PASSES (Empty Response)
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "What is the difference between this image: <image> and this image: <image>?"},
+        ],
+        "images": [image_1, image_2]
+    }
+])
 
 # PASSES
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Describe this image: <image>"},
-#         ],
-#         "images": []
-#     }
-# ])
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "What is the difference between these two images?<image><image>"},
+        ],
+        "images": [image_1, image_2]
+    }
+])
+
+# # PASSES
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Describe this image"},
+        ],
+        "images": [image_1]
+    }
+])
 
 # PASSES
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Are you conscious?"},
-#         ],
-#         "images": []
-#     },
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Describe the sky in a poetic prose please."},
-#         ],
-#         "images": []
-#     },
-# ])
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Describe this image: <image>"},
+        ],
+        "images": []
+    }
+])
 
-# FAILS
-# run_batch([
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Are you conscious?"},
-#         ],
-#         "images": []
-#     },
-#     {
-#         "messages": [
-#             {"role": "system", "content": "You are a helpful AI assistant."},
-#             {"role": "user", "content": "Describe this image: <image>"},
-#         ],
-#         "images": [image_1]
-#     },
-#     # {
-#     #     "messages": [
-#     #         {"role": "system", "content": "You are a helpful AI assistant."},
-#     #         {"role": "user", "content": "What is the difference between this image: <image> and this image: <image>?"},
-#     #     ],
-#     #     "images": [image_1, image_2]
-#     # }
-# ])
+# PASSES
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Are you conscious?"},
+        ],
+        "images": []
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "I would like for you to describe the sky in a poetic prose please."},
+        ],
+        "images": []
+    },
+])
+
+# PASSES
+run_batch([
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "Are you conscious?"},
+        ],
+        "images": []
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "What is in this image: <image>"},
+        ],
+        "images": [image_1]
+    },
+    {
+        "messages": [
+            {"role": "system", "content": "You are a helpful AI assistant."},
+            {"role": "user", "content": "What is the difference between this image: <image> and this image: <image>?"},
+        ],
+        "images": [image_1, image_2]
+    }
+])
 
 

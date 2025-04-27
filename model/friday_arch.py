@@ -59,7 +59,7 @@ class FridayPhiModel(Phi3Model):
     
     def encode_images(self, imgs: List[PIL.Image.Image]) -> torch.Tensor:
         img_tensors = [transforms.ToTensor()(img) for img in imgs]
-        print(f"self.vision_tower.device: {self.vision_tower.device}")
+        # print(f"self.vision_tower.device: {self.vision_tower.device}")
         imgs = pad_and_stack(img_tensors).to(dtype=torch.float32, device=self.vision_tower.device)
         features = self.vision_tower(imgs)
 
@@ -111,9 +111,9 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         labels: Optional[torch.LongTensor],
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.LongTensor], Optional[torch.Tensor], Optional[List[torch.FloatTensor]], torch.Tensor, Optional[torch.Tensor]]:
         
-        print("**************")
-        print(images)
-        print("**************")
+        # print("**************")
+        # print(images)
+        # print("**************")
 
         # if images is None:
         #     return input_ids, position_ids, attention_mask, past_key_values, None, labels
@@ -225,9 +225,6 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         emb_pad = torch.zeros(max_len, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
         lab_pad = torch.full((max_len,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
 
-        for e in embeds_list:
-            print(f"e.shape: {e.shape}")
-
         new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list]).to(dtype=self.dtype)
         new_labels       = torch.stack([torch.cat([l, lab_pad[l.size(0):]]) for l in labels_list]) if labels is not None else None
 
@@ -235,14 +232,10 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         attention_mask = torch.arange(max_len, device=input_ids.device).expand(bs, -1) < torch.tensor([e.size(0) for e in embeds_list], device=input_ids.device).unsqueeze(1)
         position_ids   = torch.arange(max_len, device=input_ids.device).expand(bs, -1)
 
-        print(attention_mask.shape)
-        print(attention_mask)
-
-
         if not self.training:
             new_labels = None
         
-        print(f"new_input_embeds.shape: {new_input_embeds.shape}")
+        # print(f"new_input_embeds.shape: {new_input_embeds.shape}")
 
         return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
@@ -264,6 +257,9 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
             images: Optional[PIL.Image.Image] = None,
             **kwargs: Unpack[KwargsForCausalLM],
     ) -> Union[Tuple, CausalLMOutputWithPast]:
+
+        # print(f"input_ids.shape: {input_ids.shape if input_ids is not None else 'None'}")
+        # print(input_ids)
 
         is_multi_modal = images is not None and (
             (
@@ -291,6 +287,10 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
                 past_key_values=past_key_values,
                 labels=labels,
             )
+
+            # print(f"inputs_embeds.shape: {inputs_embeds.shape}")
+            if cache_position is not None and inputs_embeds is not None and cache_position.shape[0] != inputs_embeds.shape[1]:
+                cache_position = torch.arange(inputs_embeds.shape[1], device=self.device)
             
 
         return Phi3ForCausalLM.forward(
@@ -345,9 +345,9 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
     model.get_model().load_vision_tower()
     # model.resize_token_embeddings(len(tok))
 
-    print(f"model.device: {model.device}")
-    print(f"model.get_model().device: {model.get_model().device}")
-    print(f"model.vision_tower.device: {model.get_model().vision_tower.device}")
+    # print(f"model.device: {model.device}")
+    # print(f"model.get_model().device: {model.get_model().device}")
+    # print(f"model.vision_tower.device: {model.get_model().vision_tower.device}")
     # print(f"model.projector.device: {model.get_model().projector.device}")
 
     return model, tok
