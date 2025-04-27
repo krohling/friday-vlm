@@ -22,7 +22,7 @@ config = EasyDict({
     "vision_adapter": {
         "input_dim": 1536,
         "hidden_dim": 512,
-        "output_dim": 256,
+        "output_dim": 3072,
         "layers": 2,
         "activation": "gelu"
     },

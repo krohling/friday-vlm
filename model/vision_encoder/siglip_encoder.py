@@ -20,7 +20,6 @@ class SiglipVisionTower(nn.Module):
             self.cfg_only = SiglipVisionConfig.from_pretrained(self.vision_tower_name)
 
     def load_model(self):
-        print("***load_model")
         if self.is_loaded:
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
@@ -93,7 +92,7 @@ class SiglipVisionTowerS2(SiglipVisionTower):
             self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
             self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
 
-    def load_model(self, device_map='cpu'):
+    def load_model(self, device_map='auto'):
         if self.is_loaded:
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)

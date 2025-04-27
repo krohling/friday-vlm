@@ -17,6 +17,7 @@ class MLPAdapter(nn.Module):
         super().__init__()
         self.layers = layers
         self.activation = activation
+        self.output_dim = output_dim
 
         # Define the first layer
         layers_list = [nn.Linear(input_dim, hidden_dim)]

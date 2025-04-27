@@ -7,6 +7,8 @@ from torchvision import transforms
 
 from typing import List, Tuple, Optional, Union
 
+import PIL
+
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
@@ -55,12 +57,25 @@ class FridayPhiModel(Phi3Model):
         self.vision_tower.load_model(device_map=self.device)
         self.projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
     
-    def encode_images(self, imgs: list) -> torch.Tensor:
+    def encode_images(self, imgs: List[PIL.Image.Image]) -> torch.Tensor:
         img_tensors = [transforms.ToTensor()(img) for img in imgs]
         print(f"self.vision_tower.device: {self.vision_tower.device}")
         imgs = pad_and_stack(img_tensors).to(dtype=torch.float32, device=self.vision_tower.device)
         features = self.vision_tower(imgs)
+
         return self.projector(features)
+    
+    def batch_encode_images(self, b_imgs: List[List[PIL.Image.Image]]) -> torch.Tensor:
+        img_features = []
+        for imgs in b_imgs:
+            if len(imgs) == 0:
+                img_features.append(torch.zeros((0, self.projector.output_dim), device=self.device))
+            else:
+                img_features.append(
+                    self.encode_images(imgs)
+                )
+        
+        return img_features
 
     def set_vision_projector_requires_grad(self, requires_grad: bool):
         for param in self.projector.parameters():
@@ -89,34 +104,61 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
     def prepare_inputs_labels_for_multimodal(
         self,
         input_ids: torch.LongTensor,
+        images: List[List[PIL.Image.Image]], # B x N
         position_ids: Optional[torch.LongTensor],
         attention_mask: Optional[torch.Tensor],
         past_key_values: Optional[List[torch.FloatTensor]],
         labels: Optional[torch.LongTensor],
-        images: Optional[List[torch.Tensor]],
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.LongTensor], Optional[torch.Tensor], Optional[List[torch.FloatTensor]], torch.Tensor, Optional[torch.Tensor]]:
-        """Hybrid of Bunny (robust) + Friday (<img_start>/<img_end>)."""
+        
+        print("**************")
+        print(images)
+        print("**************")
+
+        # if images is None:
+        #     return input_ids, position_ids, attention_mask, past_key_values, None, labels
+
 
         # ─────────────────── early return (no image / streaming step) ───────────────────
-        vision_tower = self.model.get_vision_tower()
-        if vision_tower is None or images is None or input_ids.shape[1] == 1:
-            if past_key_values is not None and images is not None and input_ids.shape[1] == 1:
-                tgt = past_key_values[-1][-1].shape[-2] + 1
-                attention_mask = torch.cat(
-                    [attention_mask, torch.ones((attention_mask.size(0), tgt - attention_mask.size(1)), dtype=attention_mask.dtype, device=attention_mask.device)],
-                    dim=1,
-                )
-                position_ids = attention_mask.sum(dim=1).unsqueeze(-1) - 1
+        # if we have already processed images and are in a streaming step we can skip the multimodal processing
+        # but we need to ensure the attention mask and position ids are correct
+        if past_key_values is not None and input_ids.shape[1] == 1:
+            tgt = past_key_values[-1][-1].shape[-2] + 1
+            attention_mask = torch.cat(
+                [attention_mask, torch.ones((attention_mask.size(0), tgt - attention_mask.size(1)), dtype=attention_mask.dtype, device=attention_mask.device)],
+                dim=1,
+            )
+            position_ids = attention_mask.sum(dim=1).unsqueeze(-1) - 1
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
         # ─────────────────────────── visual features (B, N, D) ───────────────────────────
-        if isinstance(images, list) or images.ndim == 5:
-            # concat = torch.cat(images, dim=0)
-            image_features = self.encode_images(images).to(self.device)
-            # splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
-            # image_features = [x.flatten(0, 1).to(self.device) for x in splits]
+        if isinstance(images, list) and isinstance(images[0], list):
+            # images is a list of lists, each containing multiple images, B x N
+            # e.g. [[img1, img2], [img3, img4]]
+            assert len(images) == input_ids.shape[0], f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
+            image_features = self.model.batch_encode_images(images)
+        elif isinstance(images, list) and isinstance(images[0], PIL.Image.Image):
+            # images is a list of images, 1 x N
+            # e.g. [img1, img2, img3]
+            assert input_ids.shape[0] == 1, f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
+            image_features = [self.encode_images(images).to(self.device)]
+        elif isinstance(images, PIL.Image.Image):
+            # images is a single image, 1 x 1
+            # e.g. img1
+            assert input_ids.shape[0] == 1, f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
+            image_features = [self.encode_images([images]).to(self.device)]
         else:
-            image_features = self.encode_images(images).to(self.device)
+            raise ValueError(f"Unsupported images format: {type(images)}. Expected list of PIL images or a single PIL image.")
+        
+        # print(f"image_features.shape: {image_features.shape}")
+
+        # if isinstance(images, list) or images.ndim == 5:
+        #     # concat = torch.cat(images, dim=0)
+        #     image_features = self.encode_images(images).to(self.device)
+        #     # splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
+        #     # image_features = [x.flatten(0, 1).to(self.device) for x in splits]
+        # else:
+        #     image_features = self.encode_images(images).to(self.device)
 
         # ───────────────────────────── pad handling prelims ──────────────────────────────
         if attention_mask is None:
@@ -137,37 +179,40 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
 
         # ───────────────────────────── splice per‑sample ────────────────────────────────
         embeds_list, labels_list = [], []
-        img_ptr = 0
+        batch_id = 0
         for ids, labs in zip(input_ids_nopad, labels_nopad):
             positions = (ids == self.image_token_id).nonzero(as_tuple=True)[0]
-            parts, lbl_parts = [], []
-            cursor = 0
+            emb_parts, lbl_parts = [], []
+            cursor, img_ptr = 0, 0
             for pos in positions:
                 txt = ids[cursor:pos]
-                parts.append(self.model.embed_tokens(txt))
+                emb_parts.append(self.model.embed_tokens(txt))
                 lbl_parts.append(txt)
 
                 # start token
-                parts.append(self.model.embed_tokens(ids.new_tensor([self.start_id])))
+                emb_parts.append(self.model.embed_tokens(ids.new_tensor([self.start_id])))
                 lbl_parts.append(ids.new_tensor([IGNORE]))
 
                 # visual tokens
-                vis = image_features[img_ptr]
-                img_ptr += 1
-                parts.append(vis)
-                lbl_parts.append(ids.new_tensor([IGNORE] * vis.size(0)))
+                vis = image_features[batch_id][img_ptr]
+                emb_parts.append(vis)
+                lbl_parts.append(ids.new_tensor([IGNORE] * vis.shape[0]))
 
                 # end token
-                parts.append(self.model.embed_tokens(ids.new_tensor([self.end_id])))
+                emb_parts.append(self.model.embed_tokens(ids.new_tensor([self.end_id])))
                 lbl_parts.append(ids.new_tensor([IGNORE]))
+
+                img_ptr += 1
                 cursor = pos + 1
+            
             # tail text
             tail = ids[cursor:]
-            parts.append(self.model.embed_tokens(tail))
+            emb_parts.append(self.model.embed_tokens(tail))
             lbl_parts.append(tail)
 
-            embeds_list.append(torch.cat(parts))
+            embeds_list.append(torch.cat(emb_parts))
             labels_list.append(torch.cat(lbl_parts))
+            batch_id += 1
 
         # ───────────────────── truncate then pad back to rectangle ──────────────────────
         max_ctx = getattr(self.config, 'tokenizer_model_max_length', None)
@@ -180,6 +225,9 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         emb_pad = torch.zeros(max_len, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
         lab_pad = torch.full((max_len,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
 
+        for e in embeds_list:
+            print(f"e.shape: {e.shape}")
+
         new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list]).to(dtype=self.dtype)
         new_labels       = torch.stack([torch.cat([l, lab_pad[l.size(0):]]) for l in labels_list]) if labels is not None else None
 
@@ -187,8 +235,15 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         attention_mask = torch.arange(max_len, device=input_ids.device).expand(bs, -1) < torch.tensor([e.size(0) for e in embeds_list], device=input_ids.device).unsqueeze(1)
         position_ids   = torch.arange(max_len, device=input_ids.device).expand(bs, -1)
 
-        if labels is None:
+        print(attention_mask.shape)
+        print(attention_mask)
+
+
+        if not self.training:
             new_labels = None
+        
+        print(f"new_input_embeds.shape: {new_input_embeds.shape}")
+
         return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
     # ------------------------------------------------------------------
@@ -206,12 +261,21 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
             return_dict: Optional[bool] = None,
             cache_position: Optional[torch.LongTensor] = None,
             logits_to_keep: Union[int, torch.Tensor] = 0,
-            images: Optional[torch.FloatTensor] = None,
+            images: Optional[PIL.Image.Image] = None,
             **kwargs: Unpack[KwargsForCausalLM],
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-        if inputs_embeds is None and images is not None:
-            print("Preparing multimodal inputs...")
+        is_multi_modal = images is not None and (
+            (
+                isinstance(images, list) and len(images) > 0 and any(i for i in images)
+            ) or
+            (
+                isinstance(images, PIL.Image.Image)
+            )
+        )
+
+        if inputs_embeds is None and is_multi_modal:
+            # print("Preparing multimodal inputs...")
             (
                 input_ids,
                 position_ids,
@@ -220,14 +284,13 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
                 inputs_embeds,
                 labels
             ) = self.prepare_inputs_labels_for_multimodal(
-                input_ids,
-                position_ids,
-                attention_mask,
-                past_key_values,
-                labels,
-                images
+                input_ids=input_ids,
+                images=images,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                past_key_values=past_key_values,
+                labels=labels,
             )
-            # print(f"inputs_embeds.shape: {inputs_embeds.shape}")
             
 
         return Phi3ForCausalLM.forward(
@@ -281,6 +344,11 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
     )
     model.get_model().load_vision_tower()
     # model.resize_token_embeddings(len(tok))
+
+    print(f"model.device: {model.device}")
+    print(f"model.get_model().device: {model.get_model().device}")
+    print(f"model.vision_tower.device: {model.get_model().vision_tower.device}")
+    # print(f"model.projector.device: {model.get_model().projector.device}")
 
     return model, tok
 
