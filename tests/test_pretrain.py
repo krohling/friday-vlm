@@ -1,8 +1,8 @@
 import torch
 from easydict import EasyDict
 from dataset import PretrainDataset, fn_pretrain_collate
-from model.friday_arch import FridayMetaModel
-from model.language_model.friday_phi import build_friday_phi
+from friday.model.friday_arch import FridayMetaModel
+from friday.model.language_model.friday_phi import build_friday_phi
 
 config = EasyDict({
     "dataset": {

@@ -4,7 +4,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from easydict import EasyDict
 from PIL import Image
 
-from model import build_friday_phi
+from friday.model import build_friday_phi
  
 torch.random.manual_seed(0)
 
@@ -36,8 +36,8 @@ else:
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path)
 
-image_1 = Image.open("cat_1.jpeg").convert("RGB")
-image_2 = Image.open("cat_2.jpg").convert("RGB")
+image_1 = Image.open("./assets/cat_1.jpeg").convert("RGB")
+image_2 = Image.open("./assets/cat_2.jpg").convert("RGB")
 generation_args = {
     "max_new_tokens": 100,
     "return_full_text": False,

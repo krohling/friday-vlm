@@ -12,10 +12,10 @@ import PIL
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from util import pad_and_stack
-from model.multi_modal_projector import MLPAdapter
-from model.vision_encoder import SiglipVisionTowerS2
-from model.language_model.phi4 import (
+from friday.util import pad_and_stack
+from friday.model.multi_modal_projector import MLPAdapter
+from friday.model.vision_encoder import SiglipVisionTowerS2
+from friday.model.language_model.phi4 import (
     Phi3Config, 
     Phi3Model, 
     Phi3ForCausalLM

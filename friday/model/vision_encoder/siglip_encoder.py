@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from transformers import SiglipVisionModel, SiglipImageProcessor, SiglipVisionConfig
-from util.s2wrapper import forward as multiscale_forward
+from friday.util.s2wrapper import forward as multiscale_forward
 
 
 class SiglipVisionTower(nn.Module):
