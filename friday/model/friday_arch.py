@@ -20,7 +20,7 @@ from friday.model.language_model.phi4 import (
     Phi3Model, 
     Phi3ForCausalLM
 )
-from friday.util.constants import (
+from friday.constants import (
     IMAGE_TOKEN,
     IMG_START_TOKEN,
     IMG_END_TOKEN,
