@@ -14,7 +14,7 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from friday.util import pad_and_stack
 from friday.model.multi_modal_projector import MLPAdapter
-from friday.model.vision_encoder import SiglipVisionTowerS2
+from friday.model.vision_encoder import SiglipVisionTower, SiglipVisionTowerS2
 from friday.model.language_model.phi4 import (
     Phi3Config, 
     Phi3Model, 
@@ -27,15 +27,44 @@ from friday.constants import (
     IGNORE_INDEX
 )
 
+DEFAULT_CFG_SPECIAL_TOKENS = {
+    "image_token_id": 200029,
+    "image_start_token_id": 200030,
+    "image_end_token_id": 200031,
+}
+DEFAULT_CFG_VISION_TOWER = {
+    "vision_tower": "google/siglip2-base-patch16-384",
+    # "vision_tower": "google/siglip2-so400m-patch16-384",
+    "s2_scales": "384,768",
+    "use_s2": True,
+}
+DEFAULT_CFG_VISION_ADAPTER = {
+    "input_dim": 1536,
+    "hidden_dim": 512,
+    "output_dim": 3072,
+    "layers": 2,
+    "activation": "gelu"
+}
+
 
 class FridayConfig(Phi3Config):
     model_type = "friday-phi"
 
-    def __init__(self, **kwargs):
+    def __init__(self, delay_load=True, **kwargs):
         super().__init__(**kwargs)
-        self.cfg_vision_tower = {}
-        self.cfg_vision_adapter = {}
-        self.cfg_special_tokens = {}
+
+        self.delay_load = delay_load
+        self.cfg_vision_tower = DEFAULT_CFG_VISION_TOWER.copy()
+        if "cfg_vision_tower" in kwargs:
+            self.cfg_vision_tower.update(kwargs["cfg_vision_tower"])
+
+        self.cfg_vision_adapter = DEFAULT_CFG_VISION_ADAPTER.copy()
+        if "cfg_vision_adapter" in kwargs:
+            self.cfg_vision_adapter.update(kwargs["cfg_vision_adapter"])
+
+        self.cfg_special_tokens = DEFAULT_CFG_SPECIAL_TOKENS.copy()
+        if "cfg_special_tokens" in kwargs:
+            self.cfg_special_tokens.update(kwargs["cfg_special_tokens"])
 
 
 class FridayModel(Phi3Model):
@@ -46,16 +75,23 @@ class FridayModel(Phi3Model):
 
         self.cfg_vision_adapter = config.cfg_vision_adapter
         self.cfg_vision_tower = config.cfg_vision_tower
+
         self.vision_tower = None
-        self.projector    = None
+        self.mm_projector    = None
+        if not config.delay_load:
+            self.initialize_vision_modules()
     
     def get_vision_tower(self):
         return self.vision_tower
     
     def initialize_vision_modules(self):
-        self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
+        if self.cfg_vision_tower['use_s2']:
+            self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
+        else:
+            self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
+        
         self.vision_tower.load_model(device_map=self.device)
-        self.projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
+        self.mm_projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
     
     def encode_images(self, imgs: List[PIL.Image.Image]) -> torch.Tensor:
         img_tensors = [transforms.ToTensor()(img) for img in imgs]
@@ -63,13 +99,13 @@ class FridayModel(Phi3Model):
         imgs = pad_and_stack(img_tensors).to(dtype=torch.float32, device=self.vision_tower.device)
         features = self.vision_tower(imgs)
 
-        return self.projector(features)
+        return self.mm_projector(features)
     
     def batch_encode_images(self, b_imgs: List[List[PIL.Image.Image]]) -> torch.Tensor:
         img_features = []
         for imgs in b_imgs:
             if len(imgs) == 0:
-                img_features.append(torch.zeros((0, self.projector.output_dim), device=self.device))
+                img_features.append(torch.zeros((0, self.mm_projector.output_dim), device=self.device))
             else:
                 img_features.append(
                     self.encode_images(imgs)
@@ -78,7 +114,7 @@ class FridayModel(Phi3Model):
         return img_features
 
     def set_vision_projector_requires_grad(self, requires_grad: bool):
-        for param in self.projector.parameters():
+        for param in self.mm_projector.parameters():
             param.requires_grad = requires_grad
 
 
@@ -91,12 +127,15 @@ class FridayForCausalLM(Phi3ForCausalLM):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
 
-        self.image_token_id = config.cfg_special_tokens["image"]
-        self.start_id       = config.cfg_special_tokens["start"]
-        self.end_id         = config.cfg_special_tokens["end"]
+        self.image_token_id = config.cfg_special_tokens["image_token_id"]
+        self.start_id       = config.cfg_special_tokens["image_start_token_id"]
+        self.end_id         = config.cfg_special_tokens["image_end_token_id"]
     
     def get_model(self) -> FridayModel:
         return self.model
+    
+    def get_vision_tower(self) -> SiglipVisionTower:
+        return self.model.get_vision_tower()
 
     def encode_images(self, imgs: list) -> torch.Tensor:  # (B,3,H,W)
         return self.model.encode_images(imgs)

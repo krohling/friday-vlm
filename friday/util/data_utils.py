@@ -8,7 +8,7 @@ import torch
 
 import transformers
 
-from friday.constants import IGNORE_INDEX, DEFAULT_IMAGE_TOKEN
+from friday.constants import IGNORE_INDEX, IMAGE_TOKEN
 from torch.utils.data import Dataset
 
 from friday import conversation as conversation_lib

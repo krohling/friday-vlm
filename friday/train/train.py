@@ -27,11 +27,17 @@ class ModelArguments:
     model_name_or_path: Optional[str] = field(default=None)
     model_type: Optional[str] = field(default=None)
     version: Optional[str] = field(default=None)
+
+    vision_tower: Optional[str] = field(default=None)
+    disable_s2: bool = field(default=False)
+    s2_scales: Optional[str] = field(default='384,768')
+
     freeze_backbone: bool = field(default=False)
     tune_mm_mlp_adapter: bool = field(default=False)
-    vision_tower: Optional[str] = field(default=None)
+
+    
+
     unfreeze_vision_tower: bool = field(default=False)
-    use_s2: bool = field(default=False)
     pretrain_mm_mlp_adapter: Optional[str] = field(default=None)
     mm_projector_type: Optional[str] = field(default='mlp2x_gelu')
 
@@ -215,11 +221,16 @@ def train():
         model = FridayForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
+            cfg_vision_tower={
+                "vision_tower": model_args.vision_tower,
+                "s2_scales": model_args.s2_scales,
+                "use_s2": not model_args.disable_s2,
+            },
             **bnb_model_from_pretrained_args
         )
 
         tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
+            'kevin510/friday',
             cache_dir=training_args.cache_dir,
             model_max_length=training_args.model_max_length,
             padding_side="right",
@@ -274,7 +285,7 @@ def train():
     else:
         conversation_lib.default_conversation = conversation_lib.conv_templates["default"]
 
-    model.get_model().initialize_vision_modules(model_args=model_args)
+    model.get_model().initialize_vision_modules()
 
     vision_tower = model.get_vision_tower()
     vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
@@ -301,7 +312,7 @@ def train():
 
     model.config.mm_projector_lr = training_args.mm_projector_lr
 
-    model.config.use_s2 = model_args.use_s2
+    # model.config.use_s2 = model_args.use_s2
 
     model.config.unfreeze_vision_tower = training_args.unfreeze_vision_tower = model_args.unfreeze_vision_tower
     if training_args.unfreeze_vision_tower:

@@ -6,7 +6,7 @@ from friday.util.s2wrapper import forward as multiscale_forward
 
 
 class SiglipVisionTower(nn.Module):
-    def __init__(self, vision_tower, delay_load=False):
+    def __init__(self, vision_tower, **kwargs):
         super().__init__()
 
         self.is_loaded = False
@@ -14,10 +14,7 @@ class SiglipVisionTower(nn.Module):
         self.vision_tower_name = vision_tower
         self.select_layer = -2
 
-        if not delay_load:
-            self.load_model()
-        else:
-            self.cfg_only = SiglipVisionConfig.from_pretrained(self.vision_tower_name)
+        self.load_model()
 
     def load_model(self):
         if self.is_loaded:
@@ -78,19 +75,18 @@ class SiglipVisionTower(nn.Module):
 
 
 class SiglipVisionTowerS2(SiglipVisionTower):
-    def __init__(self, vision_tower, s2_scales, delay_load=True):
+    def __init__(self, vision_tower, s2_scales, **kwargs):
         self.s2_scales = list(map(int, s2_scales.split(',')))
         self.s2_scales.sort()
         self.s2_split_size = self.s2_scales[0]
         self.s2_image_size = self.s2_scales[-1]
 
-        super().__init__(vision_tower, delay_load)
+        super().__init__(vision_tower)
 
         self.multiscale_forward = multiscale_forward
 
-        if not delay_load:
-            self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
-            self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
+        self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
+        self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
 
     def load_model(self, device_map='auto'):
         if self.is_loaded:

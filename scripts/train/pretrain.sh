@@ -6,13 +6,13 @@ OUTPUT_DIR=friday-$MODEL_TYPE-pretrain
 mkdir -p ./checkpoints-pretrain/$OUTPUT_DIR
 
 deepspeed friday/train/train.py \
-    --deepspeed ./script/deepspeed/zero2.json \
-    --model_name_or_path /path/to/base_llm_model \
+    --deepspeed ./scripts/deepspeed/zero2.json \
+    --model_name_or_path microsoft/Phi-4-mini-instruct \
     --model_type $MODEL_TYPE \
     --version plain \
     --data_path ./data/pretrain/friday_pretrain_laion_2m.json \
     --image_folder ./data/pretrain/images \
-    --vision_tower /path/to/siglip-so400m-patch14-384 \
+    --vision_tower google/siglip2-base-patch16-384 \
     --mm_projector_type mlp2x_gelu \
     --tune_mm_mlp_adapter True \
     --image_aspect_ratio square \
@@ -22,7 +22,7 @@ deepspeed friday/train/train.py \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 4 \
-    --evaluation_strategy "no" \
+    # --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 24000 \
     --save_total_limit 1 \
