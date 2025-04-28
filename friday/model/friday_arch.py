@@ -20,12 +20,12 @@ from friday.model.language_model.phi4 import (
     Phi3Model, 
     Phi3ForCausalLM
 )
-
-IMAGE_TOKEN = "<image>"
-IMG_START   = "<img_start>"
-IMG_END     = "<img_end>"
-IGNORE      = -100
-
+from friday.util.constants import (
+    IMAGE_TOKEN,
+    IMG_START_TOKEN,
+    IMG_END_TOKEN,
+    IGNORE_INDEX
+)
 
 
 class FridayConfig(Phi3Config):
@@ -168,7 +168,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
         if position_ids is None:
             position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
         if labels is None:
-            labels = torch.full_like(input_ids, IGNORE)
+            labels = torch.full_like(input_ids, IGNORE_INDEX)
 
         # strip current padding for efficiency
         input_ids_nopad = [ids[mask] for ids, mask in zip(input_ids, attention_mask)]
@@ -191,16 +191,16 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
                 # start token
                 emb_parts.append(self.model.embed_tokens(ids.new_tensor([self.start_id])))
-                lbl_parts.append(ids.new_tensor([IGNORE]))
+                lbl_parts.append(ids.new_tensor([IGNORE_INDEX]))
 
                 # visual tokens
                 vis = image_features[batch_id][img_ptr]
                 emb_parts.append(vis)
-                lbl_parts.append(ids.new_tensor([IGNORE] * vis.shape[0]))
+                lbl_parts.append(ids.new_tensor([IGNORE_INDEX] * vis.shape[0]))
 
                 # end token
                 emb_parts.append(self.model.embed_tokens(ids.new_tensor([self.end_id])))
-                lbl_parts.append(ids.new_tensor([IGNORE]))
+                lbl_parts.append(ids.new_tensor([IGNORE_INDEX]))
 
                 img_ptr += 1
                 cursor = pos + 1
@@ -223,7 +223,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
         max_len = max(e.size(0) for e in embeds_list)
         bs = len(embeds_list)
         emb_pad = torch.zeros(max_len, self.config.hidden_size, device=input_ids.device, dtype=self.dtype)
-        lab_pad = torch.full((max_len,), IGNORE, device=input_ids.device, dtype=input_ids.dtype)
+        lab_pad = torch.full((max_len,), IGNORE_INDEX, device=input_ids.device, dtype=input_ids.dtype)
 
         new_input_embeds = torch.stack([torch.cat([e, emb_pad[e.size(0):]]) for e in embeds_list]).to(dtype=self.dtype)
         new_labels       = torch.stack([torch.cat([l, lab_pad[l.size(0):]]) for l in labels_list]) if labels is not None else None
@@ -314,14 +314,14 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
 def build_tokenizer(base_model_id: str) -> Tuple[AutoTokenizer, dict]:
     tok = AutoTokenizer.from_pretrained(base_model_id, padding_side="right")
-    specials = {t: tok.convert_tokens_to_ids(t) for t in [IMAGE_TOKEN, IMG_START, IMG_END] if t in tok.vocab}
+    specials = {t: tok.convert_tokens_to_ids(t) for t in [IMAGE_TOKEN, IMG_START_TOKEN, IMG_END_TOKEN] if t in tok.vocab}
     if len(specials) < 3:
-        n = tok.add_tokens([IMAGE_TOKEN, IMG_START, IMG_END], special_tokens=True)
+        n = tok.add_tokens([IMAGE_TOKEN, IMG_START_TOKEN, IMG_END_TOKEN], special_tokens=True)
         tok.pad_token = tok.eos_token
         specials = {
             "image": tok.convert_tokens_to_ids(IMAGE_TOKEN),
-            "start": tok.convert_tokens_to_ids(IMG_START),
-            "end": tok.convert_tokens_to_ids(IMG_END),
+            "start": tok.convert_tokens_to_ids(IMG_START_TOKEN),
+            "end": tok.convert_tokens_to_ids(IMG_END_TOKEN),
         }
     return tok, specials
 

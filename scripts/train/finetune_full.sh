@@ -2,16 +2,16 @@
 
 MODEL_TYPE=phi-2
 
-PRETRAIN_DIR=bunny-$MODEL_TYPE-pretrain
-OUTPUT_DIR=bunny-$MODEL_TYPE
+PRETRAIN_DIR=friday-$MODEL_TYPE-pretrain
+OUTPUT_DIR=friday-$MODEL_TYPE
 
 mkdir -p ./checkpoints-$MODEL_TYPE/$OUTPUT_DIR
 
-deepspeed bunny/train/train.py \
+deepspeed friday/train/train.py \
     --deepspeed ./script/deepspeed/zero3.json \
     --model_name_or_path /path/to/base_llm_model \
     --model_type $MODEL_TYPE \
-    --version bunny \
+    --version friday \
     --data_path ./data/finetune/friday_695k.json \
     --image_folder ./data/finetune/images \
     --vision_tower /path/to/siglip-so400m-patch14-384 \

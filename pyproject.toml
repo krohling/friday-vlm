@@ -13,7 +13,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    'accelerate', 'apex', 'bitsandbytes', 'datasets', 'deepspeed', 'einops', 'einops-exts',
+    'accelerate', 'apex @ git+https://github.com/NVIDIA/apex.git', 'bitsandbytes', 'datasets', 'deepspeed', 'einops', 'einops-exts',
     'fastapi', 'gradio', 'gradio_client', 'httpx', 'markdown2', 'numpy', 'openpyxl', 'pillow',
     'peft', 'protobuf', 'pydantic', 'pypandoc', 'requests', 'scikit-learn', 'sentencepiece', 'shortuuid',
     'tabulate', 'timm', 'tiktoken', 'tokenizers', 'torch', 'torchvision', 'transformers', 'uvicorn', 'xformers'
