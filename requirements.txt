@@ -5,3 +5,5 @@ accelerate
 pillow
 easydict
 einops
+py-cpuinfo
+deepspeed

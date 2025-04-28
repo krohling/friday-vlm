@@ -28,7 +28,7 @@ IGNORE      = -100
 
 
 
-class FridayPhiConfig(Phi3Config):
+class FridayConfig(Phi3Config):
     model_type = "friday-phi"
 
     def __init__(self, **kwargs):
@@ -38,10 +38,10 @@ class FridayPhiConfig(Phi3Config):
         self.cfg_special_tokens = {}
 
 
-class FridayPhiModel(Phi3Model):
-    config_class = FridayPhiConfig
+class FridayModel(Phi3Model):
+    config_class = FridayConfig
     
-    def __init__(self, config: FridayPhiConfig):
+    def __init__(self, config: FridayConfig):
         super().__init__(config)
 
         self.cfg_vision_adapter = config.cfg_vision_adapter
@@ -52,7 +52,7 @@ class FridayPhiModel(Phi3Model):
     def get_vision_tower(self):
         return self.vision_tower
     
-    def load_vision_tower(self):
+    def initialize_vision_modules(self):
         self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
         self.vision_tower.load_model(device_map=self.device)
         self.projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
@@ -82,12 +82,12 @@ class FridayPhiModel(Phi3Model):
             param.requires_grad = requires_grad
 
 
-class FridayPhiForCausalLM(Phi3ForCausalLM):
-    config_class = FridayPhiConfig
+class FridayForCausalLM(Phi3ForCausalLM):
+    config_class = FridayConfig
 
-    def __init__(self, config: FridayPhiConfig):
+    def __init__(self, config: FridayConfig):
         super().__init__(config)
-        self.model = FridayPhiModel(config)
+        self.model = FridayModel(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
 
@@ -95,7 +95,7 @@ class FridayPhiForCausalLM(Phi3ForCausalLM):
         self.start_id       = config.cfg_special_tokens["start"]
         self.end_id         = config.cfg_special_tokens["end"]
     
-    def get_model(self) -> FridayPhiModel:
+    def get_model(self) -> FridayModel:
         return self.model
 
     def encode_images(self, imgs: list) -> torch.Tensor:  # (B,3,H,W)
@@ -326,15 +326,15 @@ def build_tokenizer(base_model_id: str) -> Tuple[AutoTokenizer, dict]:
     return tok, specials
 
 
-def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct") -> FridayPhiForCausalLM:
+def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct") -> FridayForCausalLM:
     tok, special_tokens = build_tokenizer(base_lm)
 
-    base_cfg = FridayPhiConfig.from_pretrained(base_lm)
+    base_cfg = FridayConfig.from_pretrained(base_lm)
     base_cfg.cfg_vision_tower = config.get("vision_tower", {})
     base_cfg.cfg_vision_adapter = config.get("vision_adapter", {})
     base_cfg.cfg_special_tokens = special_tokens
 
-    model = FridayPhiForCausalLM.from_pretrained(
+    model = FridayForCausalLM.from_pretrained(
         base_lm, 
         low_cpu_mem_usage=True,
         config=base_cfg, 
@@ -342,7 +342,7 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
         torch_dtype="auto",
         trust_remote_code=True,
     )
-    model.get_model().load_vision_tower()
+    model.get_model().initialize_vision_modules()
     # model.resize_token_embeddings(len(tok))
 
     # print(f"model.device: {model.device}")
@@ -353,5 +353,5 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
     return model, tok
 
 
-AutoConfig.register("friday-phi", FridayPhiConfig)
-AutoModelForCausalLM.register(FridayPhiConfig, FridayPhiForCausalLM)
+AutoConfig.register("friday-phi", FridayConfig)
+AutoModelForCausalLM.register(FridayConfig, FridayForCausalLM)

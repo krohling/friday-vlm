@@ -1,5 +1,6 @@
 .DS_Store
 LLaVA-CC3M-Pretrain-595K/
+checkpoints-*/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

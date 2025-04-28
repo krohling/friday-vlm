@@ -8,15 +8,11 @@ import torch
 
 import transformers
 
-from train.friday_trainer import FridayTrainer
+from friday.train.friday_trainer import FridayTrainer
 
-import conversation as conversation_lib
-from model import (
-    FridayPhiConfig, 
-    FridayPhiModel, 
-    FridayPhiForCausalLM
-)
-from bunny.util.data_utils import make_supervised_data_module, DataArguments
+from friday import conversation as conversation_lib
+from friday.model import *
+from friday.util.data_utils import make_supervised_data_module, DataArguments
 
 local_rank = None
 
@@ -213,7 +209,15 @@ def train():
         ))
 
     assert model_args.vision_tower is not None
-    if model_args.model_type in {'phi-1.5', 'phi-2', 'phi-3', 'qwen1.5-1.8b', 'minicpm', 'llama3-8b'}:
+    
+
+    if model_args.model_type == 'phi-4':
+        model = FridayForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            **bnb_model_from_pretrained_args
+        )
+
         tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
@@ -221,63 +225,9 @@ def train():
             padding_side="right",
             use_fast=True,
         )
-    elif model_args.model_type == 'stablelm-2':
-        tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            model_max_length=training_args.model_max_length,
-            padding_side="right",
-            use_fast=True,
-            trust_remote_code=True
-        )
 
-    if tokenizer.unk_token is not None and tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.unk_token
-
-    if model_args.model_type == 'llama3-8b':
-        tokenizer.eos_token_id = 128001
-        tokenizer.pad_token = tokenizer.eos_token
-
-    if model_args.model_type == 'phi-1.5' or model_args.model_type == 'phi-2':
-        model = BunnyPhiForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            bos_token_id=tokenizer.bos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-            **bnb_model_from_pretrained_args
-        )
-    elif model_args.model_type == 'phi-3':
-        model = BunnyPhi3ForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            **bnb_model_from_pretrained_args
-        )
-    elif model_args.model_type == 'stablelm-2':
-        model = BunnyStableLMForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            **bnb_model_from_pretrained_args
-        )
-    elif model_args.model_type == 'qwen1.5-1.8b':
-        model = BunnyQwen2ForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            **bnb_model_from_pretrained_args
-        )
-    elif model_args.model_type == 'minicpm':
-        model = BunnyMiniCPMForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            **bnb_model_from_pretrained_args
-        )
-    elif model_args.model_type == 'llama3-8b':
-        model = BunnyLlamaForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            cache_dir=training_args.cache_dir,
-            bos_token_id=tokenizer.bos_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-            **bnb_model_from_pretrained_args
-        )
+        if tokenizer.unk_token is not None and tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.unk_token
     else:
         raise ValueError(f"Unknown Model Type {model_args.model_type}")
 
@@ -373,7 +323,7 @@ def train():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args)
-    trainer = BunnyTrainer(model=model,
+    trainer = FridayTrainer(model=model,
                            tokenizer=tokenizer,
                            args=training_args,
                            **data_module)
