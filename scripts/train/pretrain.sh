@@ -10,8 +10,8 @@ deepspeed friday/train/train.py \
     --model_name_or_path microsoft/Phi-4-mini-instruct \
     --model_type $MODEL_TYPE \
     --version plain \
-    --data_path ./data/pretrain/friday_pretrain_laion_2m.json \
-    --image_folder ./data/pretrain/images \
+    --data_path ./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json \
+    --image_folder ./Bunny-v1_0-data/pretrain/images/ \
     --vision_tower google/siglip2-base-patch16-384 \
     --mm_projector_type mlp2x_gelu \
     --tune_mm_mlp_adapter True \
@@ -22,7 +22,6 @@ deepspeed friday/train/train.py \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 4 \
-    # --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 24000 \
     --save_total_limit 1 \
@@ -37,3 +36,4 @@ deepspeed friday/train/train.py \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to none | tee 2>&1 ./checkpoints-pretrain/$OUTPUT_DIR/log.txt
+    # --evaluation_strategy "no" \

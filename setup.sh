@@ -1,5 +1,6 @@
 mkdir -p ~/miniconda3
-apt install nvidia-cuda-toolkit -y
+apt install nvidia-cuda-toolkit git-lfs -y
+git lfs install
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
 bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
 rm ~/miniconda3/miniconda.sh
@@ -9,5 +10,10 @@ conda activate friday
 conda install pytorch torchvision -c pytorch -y
 git clone https://github.com/krohling/friday-vlm.git
 cd friday-vlm
-pip install -e .
-# pip install --force-reinstall torchvision
+pip install -e . --no-build-isolation
+pip install --force-reinstall torchvision
+git clone https://huggingface.co/datasets/BoyaWu10/Bunny-v1_0-data
+cat Bunny-v1_0-data/pretrain/images.tar.gz.part-* > Bunny-v1_0-data/pretrain/images.tar.gz
+cd Bunny-v1_0-data/pretrain
+tar -xvzf images.tar.gz
+rm images.tar.gz

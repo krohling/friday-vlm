@@ -37,14 +37,14 @@ def preprocess_multimodal(
 
     for source in sources:
         for sentence in source:
-            if DEFAULT_IMAGE_TOKEN in sentence['value']:
-                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
-                sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
+            if IMAGE_TOKEN in sentence['value']:
+                sentence['value'] = sentence['value'].replace(IMAGE_TOKEN, '').strip()
+                sentence['value'] = IMAGE_TOKEN + '\n' + sentence['value']
                 sentence['value'] = sentence['value'].strip()
 
-            replace_token = DEFAULT_IMAGE_TOKEN
+            replace_token = IMAGE_TOKEN
 
-            sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+            sentence["value"] = sentence["value"].replace(IMAGE_TOKEN, replace_token)
 
     return sources
 
@@ -234,8 +234,8 @@ def preprocess_plain(
     conversations = []
     for source in sources:
         assert len(source) == 2
-        assert DEFAULT_IMAGE_TOKEN in source[0]['value']
-        source[0]['value'] = DEFAULT_IMAGE_TOKEN
+        assert IMAGE_TOKEN in source[0]['value']
+        source[0]['value'] = IMAGE_TOKEN
         conversation = source[0]['value'] + source[1]['value'] + conversation_lib.default_conversation.sep
         conversations.append(conversation)
     # tokenize conversations
