@@ -143,31 +143,32 @@ def train():
     parser.add_argument('--config', type=str, help='The path to the config json file')
     args = parser.parse_args()
 
-    # load json file
+    # ------ 0. Load config ------
     if not os.path.exists(args.config):
         raise FileNotFoundError(f"Config file {args.config} does not exist.")
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
+    
+    training_args = TrainingArguments(**config.training)
+    local_rank = training_args.local_rank
 
-    # parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
-    # model_args, data_args, training_args = parser.parse_json_file(args.config)
     
     
-    local_rank = config.training.local_rank
+    
 
     # ------ 1. Configure quantization and dtype ------
-    compute_dtype = (torch.float16 if config.training.fp16 else (torch.bfloat16 if config.training.bf16 else torch.float32))
+    compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     bnb_model_from_pretrained_args = {}
-    if config.training.bits in [4, 8]:
+    if training_args.bits in [4, 8]:
         from transformers import BitsAndBytesConfig
         bnb_model_from_pretrained_args.update(dict(
-            device_map={"": config.training.device},
-            load_in_4bit=config.training.bits == 4,
-            load_in_8bit=config.training.bits == 8,
+            device_map={"": training_args.device},
+            load_in_4bit=training_args.bits == 4,
+            load_in_8bit=training_args.bits == 8,
             quantization_config=BitsAndBytesConfig(
-                load_in_4bit=config.training.bits == 4,
-                load_in_8bit=config.training.bits == 8,
-                **config.training.bits_and_bytes_params
+                load_in_4bit=training_args.bits == 4,
+                load_in_8bit=training_args.bits == 8,
+                **training_args.bits_and_bytes_params
             )
         ))
     
@@ -176,22 +177,23 @@ def train():
     # ------ 2. Load model, tokenizer, and vision tower ------
     model = FridayForCausalLM.from_pretrained(
         config.model.language_model.model_name_or_path,
-        cache_dir=config.training.cache_dir,
+        cache_dir=training_args.cache_dir,
         cfg_vision_tower=config.model.vision_tower,
         cfg_vision_adapter=config.model.vision_adapter,
-        **bnb_model_from_pretrained_args
+        **bnb_model_from_pretrained_args,
         **config.model.language_model.model_params,
     )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         config.model.language_model.tokenizer_name_or_path,
-        cache_dir=config.training.cache_dir,
+        cache_dir=training_args.cache_dir,
         **config.model.language_model.tokenizer_params,
     )
 
     if tokenizer.unk_token is not None and tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.unk_token
     
+    model.initialize_vision_modules()
     model.set_language_model_requires_grad(not config.model.language_model.freeze)
     model.set_vision_tower_requires_grad(not config.model.vision_tower.freeze)
     model.set_vision_adapter_requires_grad(not config.model.vision_adapter.freeze)
@@ -201,13 +203,13 @@ def train():
     
     
     # ------ 3. Configure model for training ------
-    if config.training.bits in [4, 8]:
+    if training_args.bits in [4, 8]:
         from peft import prepare_model_for_kbit_training
-        # TODO: should the dtype be set to float32 if config.training.fp16?
-        model.config.torch_dtype = (torch.float32 if config.training.fp16 else (torch.bfloat16 if config.training.bf16 else torch.float32))
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=config.training.gradient_checkpointing)
+        # TODO: should the dtype be set to float32 if training_args.fp16?
+        model.config.torch_dtype = (torch.float32 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
+        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
 
-    if config.training.gradient_checkpointing:
+    if training_args.gradient_checkpointing:
         if hasattr(model, "enable_input_require_grads"):
             model.enable_input_require_grads()
         else:
@@ -216,17 +218,17 @@ def train():
 
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
-    if config.training.lora_enable:
+    if training_args.lora_enable:
         from peft import LoraConfig, get_peft_model
         lora_config = LoraConfig(
             target_modules=find_all_linear_names(model),
             task_type="CAUSAL_LM",
-            **config.training.lora_params
+            **training_args.lora_params
         )
-        if config.training.bits == 16:
-            if config.training.bf16:
+        if training_args.bits == 16:
+            if training_args.bf16:
                 model.to(torch.bfloat16)
-            if config.training.fp16:
+            if training_args.fp16:
                 model.to(torch.float16)
         rank0_print("Adding LoRA adapters...")
         model = get_peft_model(model, lora_config)
@@ -236,24 +238,23 @@ def train():
     
     
     # ------ 4. Initialize vision modules and configure data types ------
-    model.initialize_vision_modules()
     vision_tower = model.get_vision_tower()
-    vision_tower.to(dtype=torch.bfloat16 if config.training.bf16 else torch.float16, device=config.training.device)
+    vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
 
-    if config.training.bits in [4, 8]:
-        model.get_model().mm_projector.to(dtype=compute_dtype, device=config.training.device)
+    if training_args.bits in [4, 8]:
+        model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
-    if config.training.bits in [4, 8]:
+    if training_args.bits in [4, 8]:
         from peft.tuners.lora import LoraLayer
         for name, module in model.named_modules():
             if isinstance(module, LoraLayer):
-                if config.training.bf16:
+                if training_args.bf16:
                     module = module.to(torch.bfloat16)
             if 'norm' in name:
                 module = module.to(torch.float32)
             if 'lm_head' in name or 'embed_tokens' in name:
                 if hasattr(module, 'weight'):
-                    if config.training.bf16 and module.weight.dtype == torch.float32:
+                    if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
     
     
@@ -284,7 +285,7 @@ def train():
                                               data_args=config.data)
     trainer = FridayTrainer(model=model,
                            tokenizer=tokenizer,
-                           args=config.training,
+                           args=training_args,
                            **data_module)
 
     
@@ -296,7 +297,7 @@ def train():
     
     
     
-    if list(pathlib.Path(config.training.output_dir).glob("checkpoint-*")):
+    if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()
@@ -304,20 +305,20 @@ def train():
 
     model.config.use_cache = True
 
-    if config.training.lora_enable:
+    if training_args.lora_enable:
         state_dict = get_peft_state_maybe_zero_3(
-            model.named_parameters(), config.training.lora_bias
+            model.named_parameters(), training_args.lora_bias
         )
         non_lora_state_dict = get_peft_state_non_lora_maybe_zero_3(
             model.named_parameters()
         )
-        if config.training.local_rank == 0 or config.training.local_rank == -1:
-            model.config.save_pretrained(config.training.output_dir)
-            model.save_pretrained(config.training.output_dir, state_dict=state_dict)
-            torch.save(non_lora_state_dict, os.path.join(config.training.output_dir, 'non_lora_trainables.bin'))
+        if training_args.local_rank == 0 or training_args.local_rank == -1:
+            model.config.save_pretrained(training_args.output_dir)
+            model.save_pretrained(training_args.output_dir, state_dict=state_dict)
+            torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
     else:
         safe_save_model_for_hf_trainer(trainer=trainer,
-                                       output_dir=config.training.output_dir)
+                                       output_dir=training_args.output_dir)
 
 
 if __name__ == "__main__":

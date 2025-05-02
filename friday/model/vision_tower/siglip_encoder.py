@@ -10,22 +10,20 @@ from friday.util.s2wrapper import forward as multiscale_forward
 
 
 class SiglipVisionTower(nn.Module):
-    def __init__(self, vision_tower, **kwargs):
+    def __init__(self, model_name_or_path, **kwargs):
         super().__init__()
 
         self.is_loaded = False
-
-        self.vision_tower_name = vision_tower
+        self.model_name_or_path = model_name_or_path
         self.select_layer = -2
-
         self.load_model()
 
     def load_model(self):
         if self.is_loaded:
             return
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
+        self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(self.vision_tower_name)
+        self.vision_tower = SiglipVisionModel.from_pretrained(self.model_name_or_path)
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
@@ -90,13 +88,13 @@ class SiglipVisionTower(nn.Module):
 
 
 class SiglipVisionTowerS2(SiglipVisionTower):
-    def __init__(self, vision_tower, s2_scales, **kwargs):
+    def __init__(self, model_name_or_path, s2_scales, **kwargs):
         self.s2_scales = list(map(int, s2_scales.split(',')))
         self.s2_scales.sort()
         self.s2_split_size = self.s2_scales[0]
         self.s2_image_size = self.s2_scales[-1]
 
-        super().__init__(vision_tower)
+        super().__init__(model_name_or_path)
 
         self.multiscale_forward = multiscale_forward
 
@@ -106,10 +104,10 @@ class SiglipVisionTowerS2(SiglipVisionTower):
     def load_model(self, device_map='auto'):
         if self.is_loaded:
             return
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.vision_tower_name)
+        self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
         self.image_processor.crop_size = self.image_processor.size
         self.vision_tower = SiglipVisionModel.from_pretrained(
-            self.vision_tower_name,
+            self.model_name_or_path,
             device_map=device_map,
         )
         self.vision_tower.requires_grad_(False)

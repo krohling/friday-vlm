@@ -3,7 +3,7 @@ import torch.nn as nn
 
 class MLPAdapter(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim, output_dim, layers=2, activation='gelu', checkpoint_path=None):
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers=2, activation='gelu', checkpoint_path=None, **kwargs):
         """
         Initialize the MLPAdapter with the given dimensions and activation function.
 
@@ -15,7 +15,7 @@ class MLPAdapter(nn.Module):
             activation (str): Activation function to use ('gelu' or 'relu').
         """
         super().__init__()
-        self.layers = layers
+        self.num_layers = num_layers
         self.activation = activation
         self.output_dim = output_dim
 
@@ -29,7 +29,7 @@ class MLPAdapter(nn.Module):
             raise ValueError("Unsupported activation function. Use 'gelu' or 'relu'.")
         
         # Define the subsequent layers
-        for _ in range(1, layers):
+        for _ in range(1, num_layers):
             layers_list.append(nn.Linear(hidden_dim, hidden_dim))
             if activation == 'gelu':
                 layers_list.append(nn.GELU())

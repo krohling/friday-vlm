@@ -34,6 +34,8 @@ class DataArguments:
 class TrainingArguments(transformers.TrainingArguments):
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
+    device: str = field(default="auto")
+    lazy_preprocess: bool = field(default=True)
     remove_unused_columns: bool = field(default=False)
     freeze_mm_mlp_adapter: bool = field(default=False)
     mpt_attn_impl: Optional[str] = field(default="triton")
@@ -64,3 +66,5 @@ class TrainingArguments(transformers.TrainingArguments):
     lora_bias: str = "none"
     mm_projector_lr: Optional[float] = None
     group_by_modality_length: bool = field(default=False)
+    bits_and_bytes_params: dict = field(default_factory=dict)
+    lora_params: dict = field(default_factory=dict)

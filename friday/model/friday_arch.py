@@ -85,7 +85,7 @@ class FridayModel(Phi3Model):
         return self.vision_tower
     
     def initialize_vision_modules(self):
-        if self.cfg_vision_tower['use_s2']:
+        if self.cfg_vision_tower.use_s2:
             self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
         else:
             self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
