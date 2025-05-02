@@ -238,6 +238,7 @@ def preprocess_plain(
         source[0]['value'] = IMAGE_TOKEN
         conversation = source[0]['value'] + source[1]['value'] + conversation_lib.default_conversation.sep
         conversations.append(conversation)
+    
     # tokenize conversations
     input_ids = [tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations]
     targets = copy.deepcopy(input_ids)
@@ -258,11 +259,10 @@ def preprocess(
 
     if conversation_lib.default_conversation.version == "friday":
         return preprocess_friday(sources, tokenizer, has_image=has_image)
-    elif conversation_lib.default_conversation.version in {"minicpm", "llama"}:
-        return preprocess_friday_with_bos(sources, tokenizer, has_image=has_image)
+    
     # temporarily fix
     # Phi-3 June 2024 Update changes bos_token behavior
-    elif conversation_lib.default_conversation.version == "phi3":
+    if conversation_lib.default_conversation.version == "phi3":
         if len(tokenizer('').input_ids) == 0:
             return preprocess_friday(sources, tokenizer, has_image=has_image)
         else:
@@ -313,24 +313,24 @@ class LazySupervisedDataset(Dataset):
             image_folder = self.data_args.image_folder
             processor = self.data_args.image_processor
             image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
-            if self.data_args.image_aspect_ratio == 'pad':
-                def expand2square(pil_img, background_color):
-                    width, height = pil_img.size
-                    if width == height:
-                        return pil_img
-                    elif width > height:
-                        result = Image.new(pil_img.mode, (width, width), background_color)
-                        result.paste(pil_img, (0, (width - height) // 2))
-                        return result
-                    else:
-                        result = Image.new(pil_img.mode, (height, height), background_color)
-                        result.paste(pil_img, ((height - width) // 2, 0))
-                        return result
+            # if self.data_args.image_aspect_ratio == 'pad':
+            #     def expand2square(pil_img, background_color):
+            #         width, height = pil_img.size
+            #         if width == height:
+            #             return pil_img
+            #         elif width > height:
+            #             result = Image.new(pil_img.mode, (width, width), background_color)
+            #             result.paste(pil_img, (0, (width - height) // 2))
+            #             return result
+            #         else:
+            #             result = Image.new(pil_img.mode, (height, height), background_color)
+            #             result.paste(pil_img, ((height - width) // 2, 0))
+            #             return result
 
-                image = expand2square(image, tuple(int(x * 255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            else:
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            #     image = expand2square(image, tuple(int(x * 255) for x in processor.image_mean))
+            #     image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            # else:
+            #     image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]), self.data_args)
         else:
@@ -395,10 +395,11 @@ class DataCollatorForSupervisedDataset(object):
 
         if 'image' in instances[0]:
             images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = images
+            batch['images'] = images
+            # if all(x is not None and x.shape == images[0].shape for x in images):
+            #     batch['images'] = torch.stack(images)
+            # else:
+            #     batch['images'] = images
 
         return batch
 

@@ -7,3 +7,4 @@ easydict
 einops
 py-cpuinfo
 deepspeed
+pytest

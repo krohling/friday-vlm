@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 
+import PIL.Image
+from typing import List
+from friday.util import expand2square, pad_and_stack
+
 from transformers import SiglipVisionModel, SiglipImageProcessor, SiglipVisionConfig
 from friday.util.s2wrapper import forward as multiscale_forward
 
@@ -25,6 +29,17 @@ class SiglipVisionTower(nn.Module):
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
+    
+    def preprocess_images(self, imgs: List[PIL.Image.Image], pad_and_stack_images=True) -> torch.Tensor:
+        img_mean = tuple(int(x * 255) for x in self.image_processor.image_mean)
+        imgs = [expand2square(img, img_mean) for img in imgs]
+        imgs = [self.image_processor(img, return_tensors="pt")['pixel_values'][0] for img in imgs]
+
+        if pad_and_stack_images:
+            imgs = pad_and_stack(imgs)
+            imgs = imgs.to(dtype=torch.float32, device=self.device)
+        
+        return imgs
 
     def feature_select(self, image_forward_outs):
         image_features = image_forward_outs.hidden_states[self.select_layer]
@@ -87,7 +102,7 @@ class SiglipVisionTowerS2(SiglipVisionTower):
 
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
         self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
-
+    
     def load_model(self, device_map='auto'):
         if self.is_loaded:
             return

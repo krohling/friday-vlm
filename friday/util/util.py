@@ -1,41 +1,42 @@
 import torch
 import torch.nn.functional as F
 
+from PIL import Image
 
-def pad_and_stack(img_list):
+def expand2square(pil_img, background_color):
+    width, height = pil_img.size
+    if width == height:
+        return pil_img
+    elif width > height:
+        result = Image.new(pil_img.mode, (width, width), background_color)
+        result.paste(pil_img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(pil_img.mode, (height, height), background_color)
+        result.paste(pil_img, ((height - width) // 2, 0))
+        return result
+
+def pad_and_stack(img_list, pad_value=0.0):
     """
-    Args
-    ----
-    img_list : list[torch.Tensor]
-        Each tensor is shape (C, H, W), dtype/ device can differ.
-
+    img_list : list[Tensor]  each (C, H, W) already *normalised*
+    pad_value: float or tuple/list of 3 floats (one per channel)
+               Use 0.0 if your processor has already centred to mean 0.
     Returns
     -------
-    batch : torch.Tensor
-        Shape (B, C, H_max, W_max) on the same device / dtype as the first image.
+    batch : Tensor  (B, C, H_max, W_max)
     """
 
-    # --- 1. work out the target size ----------------------------------------
-    h_max = max(img.shape[1] for img in img_list)
-    w_max = max(img.shape[2] for img in img_list)
+    # 1. target square size ---------------------------------------------------
+    h_max = max(t.shape[1] for t in img_list)
+    w_max = max(t.shape[2] for t in img_list)
+    H, W  = max(h_max, w_max), max(h_max, w_max)
 
-    if h_max > w_max:
-        w_max = h_max
-    elif w_max > h_max:
-        h_max = w_max
-
-    # --- 2. pad every image to (h_max, w_max) --------------------------------
-    padded_imgs = []
+    # 2. create padded copies -------------------------------------------------
+    padded = []
     for img in img_list:
-        # pad width dimension (left_pad, right_pad) then height (top_pad, bottom_pad)
-        pad_w = w_max - img.shape[2]
-        pad_h = h_max - img.shape[1]
-        # we pad only on the *right* and *bottom*; change the tuple if you want symmetry
-        padded = F.pad(img, (0, pad_w,     # width  : (left, right)
-                             0, pad_h))    # height : (top,  bottom)
-        padded_imgs.append(padded)
+        c, h, w = img.shape
+        canvas   = img.new_full((c, H, W), pad_value)     # filled with mean/zeros
+        canvas[:, :h, :w] = img                    # top-left corner
+        padded.append(canvas)
 
-    # --- 3. stack into batch --------------------------------------------------
-    batch = torch.stack(padded_imgs, dim=0)
-
-    return batch
+    return torch.stack(padded, 0)                  # (B,C,H,W)

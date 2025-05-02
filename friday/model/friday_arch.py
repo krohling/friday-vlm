@@ -12,7 +12,7 @@ import PIL
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from friday.util import pad_and_stack
+from friday.util import pad_and_stack, expand2square
 from friday.model.multi_modal_projector import MLPAdapter
 from friday.model.vision_encoder import SiglipVisionTower, SiglipVisionTowerS2
 from friday.model.language_model.phi4 import (
@@ -93,25 +93,9 @@ class FridayModel(Phi3Model):
         self.vision_tower.load_model(device_map=self.device)
         self.mm_projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
     
-    def encode_images(self, imgs: List[PIL.Image.Image]) -> torch.Tensor:
-        img_tensors = [transforms.ToTensor()(img) for img in imgs]
-        # print(f"self.vision_tower.device: {self.vision_tower.device}")
-        imgs = pad_and_stack(img_tensors).to(dtype=torch.float32, device=self.vision_tower.device)
+    def compute_image_features(self, imgs: torch.Tensor) -> torch.Tensor:
         features = self.vision_tower(imgs)
-
         return self.mm_projector(features)
-    
-    def batch_encode_images(self, b_imgs: List[List[PIL.Image.Image]]) -> torch.Tensor:
-        img_features = []
-        for imgs in b_imgs:
-            if len(imgs) == 0:
-                img_features.append(torch.zeros((0, self.mm_projector.output_dim), device=self.device))
-            else:
-                img_features.append(
-                    self.encode_images(imgs)
-                )
-        
-        return img_features
 
     def set_vision_projector_requires_grad(self, requires_grad: bool):
         for param in self.mm_projector.parameters():
@@ -137,9 +121,6 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def get_vision_tower(self) -> SiglipVisionTower:
         return self.model.get_vision_tower()
 
-    def encode_images(self, imgs: list) -> torch.Tensor:  # (B,3,H,W)
-        return self.model.encode_images(imgs)
-
     def prepare_inputs_labels_for_multimodal(
         self,
         input_ids: torch.LongTensor,
@@ -150,14 +131,6 @@ class FridayForCausalLM(Phi3ForCausalLM):
         labels: Optional[torch.LongTensor],
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.LongTensor], Optional[torch.Tensor], Optional[List[torch.FloatTensor]], torch.Tensor, Optional[torch.Tensor]]:
         
-        # print("**************")
-        # print(images)
-        # print("**************")
-
-        # if images is None:
-        #     return input_ids, position_ids, attention_mask, past_key_values, None, labels
-
-
         # ─────────────────── early return (no image / streaming step) ───────────────────
         # if we have already processed images and are in a streaming step we can skip the multimodal processing
         # but we need to ensure the attention mask and position ids are correct
@@ -170,34 +143,60 @@ class FridayForCausalLM(Phi3ForCausalLM):
             position_ids = attention_mask.sum(dim=1).unsqueeze(-1) - 1
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
-        # ─────────────────────────── visual features (B, N, D) ───────────────────────────
+        # ─────────────────────────── images: (B, N) ───────────────────────────
         if isinstance(images, list) and isinstance(images[0], list):
             # images is a list of lists, each containing multiple images, B x N
             # e.g. [[img1, img2], [img3, img4]]
             assert len(images) == input_ids.shape[0], f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
-            image_features = self.model.batch_encode_images(images)
+            image_features = []
+            for sublst_images in images:
+                if len(sublst_images) == 0:
+                    image_features.append(torch.zeros((0, self.get_model().mm_projector.output_dim), device=self.device))
+                else:
+                    if isinstance(sublst_images[0], PIL.Image.Image):
+                        image_features.append(
+                            self.model.compute_image_features(
+                                self.model.vision_tower.preprocess_images(sublst_images)
+                            )
+                        )
+                    elif isinstance(sublst_images[0], torch.Tensor):
+                        # This should be a list of tensors of pre-processed images, [(N X 3 X W x H), ...]
+                        image_features.append(
+                            self.model.compute_image_features(sublst_images)
+                        )
         elif isinstance(images, list) and isinstance(images[0], PIL.Image.Image):
-            # images is a list of images, 1 x N
+            # images is a list of images for a single batch item, 1 x N
             # e.g. [img1, img2, img3]
             assert input_ids.shape[0] == 1, f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
-            image_features = [self.encode_images(images).to(self.device)]
+            image_features = [
+                self.model.compute_image_features(
+                    self.model.vision_tower.preprocess_images(images)
+                )
+            ]
+        elif isinstance(images, list) and isinstance(images[0], torch.Tensor):
+            # This should be a list of tensors of pre-processed batch of images, [(N X 3 X W x H), ...]
+            image_features = [
+                self.model.compute_image_features(imgs) for imgs in images
+            ]
         elif isinstance(images, PIL.Image.Image):
             # images is a single image, 1 x 1
             # e.g. img1
             assert input_ids.shape[0] == 1, f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
-            image_features = [self.encode_images([images]).to(self.device)]
+            image_features = [
+                self.model.compute_image_features(
+                    self.model.vision_tower.preprocess_images([images])
+                )
+            ]
         else:
-            raise ValueError(f"Unsupported images format: {type(images)}. Expected list of PIL images or a single PIL image.")
+            raise ValueError(f"Unsupported images format: {type(images)}. Expected list of PIL images, a single PIL image or a Tensor of pre-processed images")
         
-        # print(f"image_features.shape: {image_features.shape}")
-
-        # if isinstance(images, list) or images.ndim == 5:
-        #     # concat = torch.cat(images, dim=0)
-        #     image_features = self.encode_images(images).to(self.device)
-        #     # splits = torch.split(feats, [img.shape[0] for img in images], dim=0)
-        #     # image_features = [x.flatten(0, 1).to(self.device) for x in splits]
-        # else:
-        #     image_features = self.encode_images(images).to(self.device)
+        # ─────────────────────────── image_features: (B x N x D) ───────────────────────────
+        if isinstance(image_features, list):
+            assert input_ids.shape[0] == len(image_features), f"Incorrectly formatted image_features: list length should match batch size"
+            assert isinstance(image_features[0], torch.Tensor), f"Incorrectly formatted image_features: list items should be tensors"
+        elif isinstance(image_features, torch.Tensor):
+            assert input_ids.shape[0] == image_features.shape[0], f"Incorrectly formatted image_features: tensor should match batch size"
+        
 
         # ───────────────────────────── pad handling prelims ──────────────────────────────
         if attention_mask is None:
@@ -223,6 +222,12 @@ class FridayForCausalLM(Phi3ForCausalLM):
             positions = (ids == self.image_token_id).nonzero(as_tuple=True)[0]
             emb_parts, lbl_parts = [], []
             cursor, img_ptr = 0, 0
+
+            if len(positions) != image_features[batch_id].shape[0]:
+                raise ValueError(
+                    f"Mismatch between number of image tokens ({len(positions)}) and number of image features ({image_features[batch_id].shape[0]})"
+                )
+
             for pos in positions:
                 txt = ids[cursor:pos]
                 emb_parts.append(self.model.embed_tokens(txt))
@@ -300,14 +305,12 @@ class FridayForCausalLM(Phi3ForCausalLM):
         # print(f"input_ids.shape: {input_ids.shape if input_ids is not None else 'None'}")
         # print(input_ids)
 
-        is_multi_modal = images is not None and (
+        is_multi_modal = images is not None and not (
             (
-                isinstance(images, list) and len(images) > 0 and any(i for i in images)
-            ) or
-            (
-                isinstance(images, PIL.Image.Image)
+                isinstance(images, list) and (len(images) == 0 or all(i == [] for i in images))
             )
         )
+
 
         if inputs_embeds is None and is_multi_modal:
             # print("Preparing multimodal inputs...")
@@ -382,12 +385,6 @@ def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct
         trust_remote_code=True,
     )
     model.get_model().initialize_vision_modules()
-    # model.resize_token_embeddings(len(tok))
-
-    # print(f"model.device: {model.device}")
-    # print(f"model.get_model().device: {model.get_model().device}")
-    # print(f"model.vision_tower.device: {model.get_model().vision_tower.device}")
-    # print(f"model.projector.device: {model.get_model().projector.device}")
 
     return model, tok
 
