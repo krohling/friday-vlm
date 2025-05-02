@@ -16,15 +16,7 @@ from friday import conversation as conversation_lib
 from friday.util.mm_utils import tokenizer_image_token
 
 from PIL import Image
-
-
-@dataclass
-class DataArguments:
-    data_path: str = field(default=None, metadata={"help": "Path to the training data."})
-    lazy_preprocess: bool = False
-    is_multimodal: bool = True
-    image_folder: Optional[str] = field(default=None)
-    image_aspect_ratio: str = field(default=None)
+from friday.train.config import DataArguments
 
 
 def preprocess_multimodal(

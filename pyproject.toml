@@ -16,7 +16,7 @@ dependencies = [
     'accelerate', 'apex @ git+https://github.com/NVIDIA/apex.git', 'bitsandbytes', 'datasets', 'deepspeed', 'einops', 'einops-exts',
     'fastapi', 'gradio', 'gradio_client', 'httpx', 'markdown2', 'numpy', 'openpyxl', 'pillow',
     'peft', 'protobuf', 'pydantic', 'pypandoc', 'requests', 'scikit-learn', 'sentencepiece', 'shortuuid',
-    'tabulate', 'timm', 'tiktoken', 'tokenizers', 'torch', 'torchvision', 'transformers', 'uvicorn', 'xformers', 'pytest'
+    'tabulate', 'timm', 'tiktoken', 'tokenizers', 'torch', 'torchvision', 'transformers', 'uvicorn', 'xformers', 'pytest', 'easydict'
 ]
 
 

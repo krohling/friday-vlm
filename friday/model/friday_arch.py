@@ -13,8 +13,8 @@ from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from friday.util import pad_and_stack, expand2square
-from friday.model.multi_modal_projector import MLPAdapter
-from friday.model.vision_encoder import SiglipVisionTower, SiglipVisionTowerS2
+from friday.model.vision_adapter import MLPAdapter
+from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
 from friday.model.language_model.phi4 import (
     Phi3Config, 
     Phi3Model, 
@@ -97,9 +97,19 @@ class FridayModel(Phi3Model):
         features = self.vision_tower(imgs)
         return self.mm_projector(features)
 
-    def set_vision_projector_requires_grad(self, requires_grad: bool):
-        for param in self.mm_projector.parameters():
-            param.requires_grad = requires_grad
+    def set_vision_adapter_requires_grad(self, requires_grad: bool):
+        if self.mm_projector is not None:
+            for param in self.mm_projector.parameters():
+                param.requires_grad = requires_grad
+        else:
+            raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
+    
+    def set_vision_tower_requires_grad(self, requires_grad: bool):
+        if self.vision_tower is not None:
+            for param in self.vision_tower.parameters():
+                param.requires_grad = requires_grad
+        else:
+            raise ValueError("Vision tower is not initialized. Please call initialize_vision_modules() first.")
 
 
 class FridayForCausalLM(Phi3ForCausalLM):
@@ -107,6 +117,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
     def __init__(self, config: FridayConfig):
         super().__init__(config)
+        self.config = config
         self.model = FridayModel(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
@@ -120,6 +131,21 @@ class FridayForCausalLM(Phi3ForCausalLM):
     
     def get_vision_tower(self) -> SiglipVisionTower:
         return self.model.get_vision_tower()
+
+    def set_language_model_requires_grad(self, requires_grad: bool):
+        for param in self.model.parameters():
+            param.requires_grad = requires_grad
+        for param in self.lm_head.parameters():
+            param.requires_grad = requires_grad
+    
+    def set_vision_tower_requires_grad(self, requires_grad: bool):
+        self.model.set_vision_tower_requires_grad(requires_grad)
+
+    def set_vision_adapter_requires_grad(self, requires_grad: bool):
+        self.model.set_vision_adapter_requires_grad(requires_grad)
+    
+    def initialize_vision_modules(self):
+        self.model.initialize_vision_modules()
 
     def prepare_inputs_labels_for_multimodal(
         self,
