@@ -5,7 +5,7 @@
         "tokenizer_name_or_path": "kevin510/friday",
         "freeze": true,
         "tokenizer_params": {
-            "max_length": 2048,
+            "max_length": 1024,
             "padding_side": "right",
             "use_fast": true,
             "trust_remote_code": true
@@ -62,19 +62,21 @@
         "output_dir": "./checkpoints-pretrain/friday",
         "num_train_epochs": 1,
         "per_device_train_batch_size": 8,
-        "per_device_eval_batch_size": 8,
+        "per_device_eval_batch_size": 4,
         "gradient_accumulation_steps": 4,
         "save_strategy": "steps",
         "save_steps": 24000,
         "save_total_limit": 1,
         "learning_rate": 5e-4,
-        "weight_decay": 0.01,
+        "weight_decay": 0.0,
         "warmup_ratio": 0.03,
         "lr_scheduler_type": "cosine",
         "logging_steps": 1,
         "tf32": true,
         "gradient_checkpointing": true,
-        "dataloader_num_workers": 4
+        "dataloader_num_workers": 4,
+        "model_max_length": 1024,
+        "report_to": "none | tee 2>&1 ./checkpoints-pretrain/friday/log.txt"
     },
     "data": {
         "conversation_template": "plain",

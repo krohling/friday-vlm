@@ -16,7 +16,7 @@ from friday.train.friday_trainer import FridayTrainer
 from friday import conversation as conversation_lib
 from friday.model import *
 from friday.util.data_utils import make_supervised_data_module
-from friday.train.config import ModelArguments, TrainingArguments, DataArguments
+from friday.train.config import ModelArguments, FridayTrainingArguments, DataArguments
 
 local_rank = None
 
@@ -141,7 +141,10 @@ def train():
 
     parser = argparse.ArgumentParser(description="Example script")
     parser.add_argument('--config', type=str, help='The path to the config json file')
+    parser.add_argument('--deepspeed', type=str, help='The path to the deepspeed config json file')
+    parser.add_argument('--local_rank', type=int, help='The local rank for distributed training', default=-1)
     args = parser.parse_args()
+    local_rank = args.local_rank
 
     # ------ 0. Load config ------
     if not os.path.exists(args.config):
@@ -149,8 +152,26 @@ def train():
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
     
-    training_args = TrainingArguments(**config.training)
-    local_rank = training_args.local_rank
+    import inspect
+    print(inspect.getfile(transformers.TrainingArguments))
+    ta = transformers.TrainingArguments(output_dir="/tmp")
+    print("distributed_state" in ta.__dict__)
+    print(hasattr(ta, "distributed_state")) 
+
+    print(inspect.getfile(FridayTrainingArguments))
+    training_args = FridayTrainingArguments(**config.training)
+    print("distributed_state" in training_args.__dict__)
+    print(hasattr(training_args, "distributed_state")) 
+    
+    # print(TrainingArguments)
+    # from transformers import HfArgumentParser
+    # parser = HfArgumentParser(TrainingArguments)
+    # training_args, = parser.parse_dict(config.training)
+
+
+
+    training_args.deepspeed = args.deepspeed if args.deepspeed else None
+    
 
     
     
@@ -283,6 +304,7 @@ def train():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=config.data)
+    print(f"training_args: {training_args}")
     trainer = FridayTrainer(model=model,
                            tokenizer=tokenizer,
                            args=training_args,

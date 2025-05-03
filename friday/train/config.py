@@ -30,8 +30,12 @@ class DataArguments:
     image_aspect_ratio: str = field(default=None)
 
 
+import accelerate
 @dataclass
-class TrainingArguments(transformers.TrainingArguments):
+class FridayTrainingArguments(transformers.TrainingArguments):
+    distributed_state: Optional[accelerate.PartialState] = field(
+        default=None, init=False, repr=False
+    )
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     device: str = field(default="auto")
