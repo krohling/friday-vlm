@@ -30,17 +30,17 @@ class DataArguments:
     image_aspect_ratio: str = field(default=None)
 
 
-import accelerate
+# import accelerate
 @dataclass
 class FridayTrainingArguments(transformers.TrainingArguments):
-    distributed_state: Optional[accelerate.PartialState] = field(
-        default=None, init=False, repr=False
-    )
+    # distributed_state: Optional[accelerate.PartialState] = field(
+    #     default=None, init=False, repr=False
+    # )
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
-    device: str = field(default="auto")
+    # device: str = field(default="auto")
     lazy_preprocess: bool = field(default=True)
-    remove_unused_columns: bool = field(default=False)
+    # remove_unused_columns: bool = field(default=False)
     freeze_mm_mlp_adapter: bool = field(default=False)
     mpt_attn_impl: Optional[str] = field(default="triton")
     model_max_length: int = field(

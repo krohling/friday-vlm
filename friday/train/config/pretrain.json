@@ -56,6 +56,29 @@
           "bias": "none",
           "weight_path": ""
       },
+      "deepspeed": {
+          "fp16": {
+              "enabled": "auto",
+              "loss_scale": 0,
+              "loss_scale_window": 1000,
+              "initial_scale_power": 16,
+              "hysteresis": 2,
+              "min_loss_scale": 1
+          },
+          "bf16": {
+              "enabled": "auto"
+          },
+          "train_micro_batch_size_per_gpu": "auto",
+          "train_batch_size": "auto",
+          "gradient_accumulation_steps": "auto",
+          "zero_optimization": {
+              "stage": 2,
+              "overlap_comm": true,
+              "contiguous_gradients": true,
+              "sub_group_size": 1e9,
+              "reduce_bucket_size": "auto"
+          }
+      },
       "eval_strategy": "no",
       "lazy_preprocess": true,
       "mm_projector_lr": null,
@@ -77,7 +100,7 @@
       "gradient_checkpointing": true,
       "dataloader_num_workers": 4,
       "model_max_length": 1024,
-      "report_to": "none | tee 2>&1 ./checkpoints-pretrain/friday/log.txt"
+      "report_to": "none"
   },
   "data": {
       "conversation_template": "plain",
