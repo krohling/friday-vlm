@@ -152,24 +152,7 @@ def train():
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
     
-    import inspect
-    print(inspect.getfile(transformers.TrainingArguments))
-    ta = transformers.TrainingArguments(output_dir="/tmp")
-    print("distributed_state" in ta.__dict__)
-    print(hasattr(ta, "distributed_state")) 
-
-    print(inspect.getfile(FridayTrainingArguments))
     training_args = FridayTrainingArguments(**config.training)
-    print("distributed_state" in training_args.__dict__)
-    print(hasattr(training_args, "distributed_state")) 
-    
-    # print(TrainingArguments)
-    # from transformers import HfArgumentParser
-    # parser = HfArgumentParser(TrainingArguments)
-    # training_args, = parser.parse_dict(config.training)
-
-
-
     training_args.deepspeed = args.deepspeed if args.deepspeed else None
     
 
@@ -178,7 +161,6 @@ def train():
     
 
     # ------ 1. Configure quantization and dtype ------
-    compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     bnb_model_from_pretrained_args = {}
     if training_args.bits in [4, 8]:
         from transformers import BitsAndBytesConfig
@@ -196,11 +178,13 @@ def train():
 
 
     # ------ 2. Load model, tokenizer, and vision tower ------
+    compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     model = FridayForCausalLM.from_pretrained(
         config.model.language_model.model_name_or_path,
         cache_dir=training_args.cache_dir,
         cfg_vision_tower=config.model.vision_tower,
         cfg_vision_adapter=config.model.vision_adapter,
+        torch_dtype=compute_dtype,
         **bnb_model_from_pretrained_args,
         **config.model.language_model.model_params,
     )
@@ -304,7 +288,17 @@ def train():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=config.data)
-    print(f"training_args: {training_args}")
+    
+    # print("******************************************")
+    # print(model.device)
+    # print(set({p.dtype for p in model.parameters()}))
+    # print(model.get_model().device)
+    # print(set({p.dtype for p in model.get_model().parameters()}))
+    # print(model.get_model().vision_tower.device)
+    # print(set({p.dtype for p in model.get_model().vision_tower.parameters()}))
+    # print(set({p.dtype for p in model.get_model().mm_projector.parameters()}))
+    # print("******************************************")
+
     trainer = FridayTrainer(model=model,
                            tokenizer=tokenizer,
                            args=training_args,
