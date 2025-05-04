@@ -178,10 +178,22 @@ conv_phi3 = Conversation(
     sep=" ",
     sep2="<|endoftext|>",
 )
+
+conv_plain = Conversation(
+    system="",
+    roles=("", ""),
+    messages=(
+    ),
+    offset=0,
+    sep_style=SeparatorStyle.PLAIN,
+    sep="\n",
+)
+
 default_conversation = conv_phi3
 conv_templates = {
     "default": conv_phi3,
     "phi3": conv_phi3,
+    "plain": conv_plain,
 }
 
 if __name__ == "__main__":

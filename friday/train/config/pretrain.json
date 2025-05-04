@@ -19,7 +19,11 @@
       "model_name_or_path": "google/siglip2-base-patch16-384",
       "s2_scales": "384,768",
       "use_s2": true,
-      "freeze": true
+      "pad_to_square": true,
+      "freeze": true,
+      "model_params": {
+          "device_map": "cuda"
+      }
     },
     "vision_adapter": {
       "input_dim": 1536,
@@ -28,18 +32,19 @@
       "num_layers": 2,
       "activation": "gelu",
       "checkpoint_path": null,
-      "freeze": false
+      "freeze": false,
+      "device": "cuda"
     }
   },
   "training": {
       "local_rank": -1,
-      "device": "cuda",
       "cache_dir": null,
       "optim": "adamw_torch",
       "remove_unused_columns": false,
       "freeze_mm_mlp_adapter": false,
       "mpt_attn_impl": "triton",
       "bf16": true,
+      "tf32": true,
       "bits": 16,
       "bits_and_bytes_params": {
           "llm_int8_skip_modules": ["mm_projector"],
@@ -85,7 +90,7 @@
       "group_by_modality_length": false,
       "output_dir": "./checkpoints-pretrain/friday",
       "num_train_epochs": 1,
-      "per_device_train_batch_size": 1,
+      "per_device_train_batch_size": 2,
       "per_device_eval_batch_size": 1,
       "gradient_accumulation_steps": 4,
       "save_strategy": "steps",
@@ -96,7 +101,6 @@
       "warmup_ratio": 0.03,
       "lr_scheduler_type": "cosine",
       "logging_steps": 1,
-      "tf32": true,
       "gradient_checkpointing": true,
       "dataloader_num_workers": 4,
       "model_max_length": 1024,

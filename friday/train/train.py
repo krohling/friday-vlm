@@ -239,15 +239,9 @@ def train():
         model = get_peft_model(model, lora_config)
 
     
-    
-    
-    
-    # ------ 4. Initialize vision modules and configure data types ------
-    vision_tower = model.get_vision_tower()
-    vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-
+    model.get_vision_tower().to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16)
     if training_args.bits in [4, 8]:
-        model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
+        model.get_model().mm_projector.to(dtype=compute_dtype)
 
     if training_args.bits in [4, 8]:
         from peft.tuners.lora import LoraLayer
@@ -262,6 +256,7 @@ def train():
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
     
+    model.print_device_configuration()
     
     
     
@@ -289,15 +284,6 @@ def train():
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=config.data)
     
-    # print("******************************************")
-    # print(model.device)
-    # print(set({p.dtype for p in model.parameters()}))
-    # print(model.get_model().device)
-    # print(set({p.dtype for p in model.get_model().parameters()}))
-    # print(model.get_model().vision_tower.device)
-    # print(set({p.dtype for p in model.get_model().vision_tower.parameters()}))
-    # print(set({p.dtype for p in model.get_model().mm_projector.parameters()}))
-    # print("******************************************")
 
     trainer = FridayTrainer(model=model,
                            tokenizer=tokenizer,

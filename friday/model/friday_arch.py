@@ -12,7 +12,7 @@ import PIL
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from friday.util import pad_and_stack, expand2square
+from friday.util import pad_and_stack, expand2square, get_module_device
 from friday.model.vision_adapter import MLPAdapter
 from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
 from friday.model.language_model.phi4 import (
@@ -33,10 +33,11 @@ DEFAULT_CFG_SPECIAL_TOKENS = {
     "image_end_token_id": 200031,
 }
 DEFAULT_CFG_VISION_TOWER = {
-    "vision_tower": "google/siglip2-base-patch16-384",
-    # "vision_tower": "google/siglip2-so400m-patch16-384",
+    "model_name_or_path": "google/siglip2-base-patch16-384",
+    # "model_name_or_path": "google/siglip2-so400m-patch16-384",
     "s2_scales": "384,768",
     "use_s2": True,
+    "pad_to_square": True,
 }
 DEFAULT_CFG_VISION_ADAPTER = {
     "input_dim": 1536,
@@ -85,13 +86,16 @@ class FridayModel(Phi3Model):
         return self.vision_tower
     
     def initialize_vision_modules(self):
-        if self.cfg_vision_tower.use_s2:
+        if self.vision_tower is not None:
+            return
+
+        if self.cfg_vision_tower.get("use_s2", True):
             self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
         else:
             self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
         
-        self.vision_tower.load_model(device_map=self.device)
-        self.mm_projector = MLPAdapter(**self.cfg_vision_adapter).to(device=self.device)
+        self.vision_tower.load_model()
+        self.mm_projector = MLPAdapter(**self.cfg_vision_adapter)
     
     def compute_image_features(self, imgs: torch.Tensor) -> torch.Tensor:
         features = self.vision_tower(imgs)
@@ -182,7 +186,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
                     if isinstance(sublst_images[0], PIL.Image.Image):
                         image_features.append(
                             self.model.compute_image_features(
-                                self.model.vision_tower.preprocess_images(sublst_images)
+                                self.model.vision_tower.preprocess_images(sublst_images, pad_and_stack_tensors=True)
                             )
                         )
                     elif isinstance(sublst_images[0], torch.Tensor):
@@ -196,11 +200,13 @@ class FridayForCausalLM(Phi3ForCausalLM):
             assert input_ids.shape[0] == 1, f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
             image_features = [
                 self.model.compute_image_features(
-                    self.model.vision_tower.preprocess_images(images)
+                    self.model.vision_tower.preprocess_images(images, pad_and_stack_tensors=True)
                 )
             ]
         elif isinstance(images, list) and isinstance(images[0], torch.Tensor):
-            # This should be a list of tensors of pre-processed batch of images, [(N X 3 X W x H), ...]
+            # This should be a list of tensors of pre-processed images, [(N X 3 X W x H), ...]
+            # The list length should match the batch size
+            assert input_ids.shape[0] == len(images), f"Batch size mismatch: {len(images)} vs {input_ids.shape[0]}"
             image_features = [
                 self.model.compute_image_features(imgs) for imgs in images
             ]
@@ -377,6 +383,14 @@ class FridayForCausalLM(Phi3ForCausalLM):
             logits_to_keep=logits_to_keep,
             **kwargs
         )
+    
+    def print_device_configuration(self):
+        print("*************Device Configuration*********")
+        print(f"Model device: {self.device} dtype: {set({p.dtype for p in self.parameters()})}")
+        print(f"FridayModel device: {self.get_model().device} dtype: {set({p.dtype for p in self.get_model().parameters()})}")
+        print(f"Vision tower device: {self.get_model().vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
+        print(f"MM Projector device: {get_module_device(self.get_model().mm_projector)} dtype: {set({p.dtype for p in self.get_model().mm_projector.parameters()})}")
+        print("******************************************")
 
 
 
@@ -394,25 +408,25 @@ def build_tokenizer(base_model_id: str) -> Tuple[AutoTokenizer, dict]:
     return tok, specials
 
 
-def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct") -> FridayForCausalLM:
-    tok, special_tokens = build_tokenizer(base_lm)
+# def build_friday_phi(config: dict, base_lm: str = "microsoft/Phi-4-mini-instruct") -> FridayForCausalLM:
+#     tok, special_tokens = build_tokenizer(base_lm)
 
-    base_cfg = FridayConfig.from_pretrained(base_lm)
-    base_cfg.cfg_vision_tower = config.get("vision_tower", {})
-    base_cfg.cfg_vision_adapter = config.get("vision_adapter", {})
-    base_cfg.cfg_special_tokens = special_tokens
+#     base_cfg = FridayConfig.from_pretrained(base_lm)
+#     base_cfg.cfg_vision_tower = config.get("vision_tower", {})
+#     base_cfg.cfg_vision_adapter = config.get("vision_adapter", {})
+#     base_cfg.cfg_special_tokens = special_tokens
 
-    model = FridayForCausalLM.from_pretrained(
-        base_lm, 
-        low_cpu_mem_usage=True,
-        config=base_cfg, 
-        device_map="auto",
-        torch_dtype="auto",
-        trust_remote_code=True,
-    )
-    model.get_model().initialize_vision_modules()
+#     model = FridayForCausalLM.from_pretrained(
+#         base_lm, 
+#         low_cpu_mem_usage=True,
+#         config=base_cfg, 
+#         device_map="auto",
+#         torch_dtype="auto",
+#         trust_remote_code=True,
+#     )
+#     model.get_model().initialize_vision_modules()
 
-    return model, tok
+#     return model, tok
 
 
 AutoConfig.register("friday-phi", FridayConfig)

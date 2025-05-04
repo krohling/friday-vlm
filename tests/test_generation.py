@@ -1,23 +1,38 @@
+import json
+from easydict import EasyDict
 import pytest
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from PIL import Image
 from friday.model import FridayForCausalLM
 
+USE_FRIDAY = True
+
+# load model.json config
+with open("tests/assets/model.json", "r") as f:
+    model_config = EasyDict(json.load(f))
+
+
 @pytest.fixture(scope="module")
 def model_and_tokenizer():
     torch.random.manual_seed(0)
 
-    USE_FRIDAY = True
     if USE_FRIDAY:
         model = FridayForCausalLM.from_pretrained(
-            "microsoft/Phi-4-mini-instruct",
-            device_map="auto",
-            torch_dtype="auto",
-            trust_remote_code=True,
+            model_config.language_model.model_name_or_path,
+            cfg_vision_tower=model_config.vision_tower,
+            cfg_vision_adapter=model_config.vision_adapter,
+            **model_config.language_model.model_params,
+            torch_dtype=torch.bfloat16
         )
-        tokenizer = AutoTokenizer.from_pretrained("kevin510/friday")
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_config.language_model.tokenizer_name_or_path,
+            **model_config.language_model.tokenizer_params,
+        )
+
         model.get_model().initialize_vision_modules()
+        model.print_device_configuration()
     else:
         model_path = "microsoft/Phi-4-mini-instruct"
         model = AutoModelForCausalLM.from_pretrained(
@@ -27,7 +42,8 @@ def model_and_tokenizer():
             trust_remote_code=True,
         )
         tokenizer = AutoTokenizer.from_pretrained(model_path)
-
+    
+    model.eval()
     pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
     return model, tokenizer, pipe
 

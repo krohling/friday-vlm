@@ -1,5 +1,4 @@
 from .friday_arch import (
-    build_friday_phi, 
     build_tokenizer, 
     FridayConfig, 
     FridayModel, 
@@ -7,7 +6,6 @@ from .friday_arch import (
 )
 
 __all__ = [
-    "build_friday_phi",
     "build_tokenizer",
     "FridayConfig",
     "FridayModel",

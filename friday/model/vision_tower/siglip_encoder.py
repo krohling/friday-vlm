@@ -10,11 +10,13 @@ from friday.util.s2wrapper import forward as multiscale_forward
 
 
 class SiglipVisionTower(nn.Module):
-    def __init__(self, model_name_or_path, **kwargs):
+    def __init__(self, model_name_or_path, model_params={}, pad_to_square=True, **kwargs):
         super().__init__()
 
         self.is_loaded = False
         self.model_name_or_path = model_name_or_path
+        self.model_params = model_params
+        self.pad_to_square = pad_to_square
         self.select_layer = -2
         self.load_model()
 
@@ -23,17 +25,21 @@ class SiglipVisionTower(nn.Module):
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
         self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(self.model_name_or_path)
+        self.vision_tower = SiglipVisionModel.from_pretrained(
+            self.model_name_or_path,
+            **self.model_params,
+        )
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
     
-    def preprocess_images(self, imgs: List[PIL.Image.Image], pad_and_stack_images=True) -> torch.Tensor:
+    def preprocess_images(self, imgs: List[PIL.Image.Image], pad_and_stack_tensors=True) -> torch.Tensor:
         img_mean = tuple(int(x * 255) for x in self.image_processor.image_mean)
-        imgs = [expand2square(img, img_mean) for img in imgs]
+        if self.pad_to_square:
+            imgs = [expand2square(img, img_mean) for img in imgs]
         imgs = [self.image_processor(img, return_tensors="pt")['pixel_values'][0] for img in imgs]
 
-        if pad_and_stack_images:
+        if pad_and_stack_tensors:
             imgs = pad_and_stack(imgs)
             imgs = imgs.to(dtype=torch.float32, device=self.device)
         
@@ -88,27 +94,27 @@ class SiglipVisionTower(nn.Module):
 
 
 class SiglipVisionTowerS2(SiglipVisionTower):
-    def __init__(self, model_name_or_path, s2_scales, **kwargs):
+    def __init__(self, model_name_or_path, s2_scales, model_params={}, **kwargs):
         self.s2_scales = list(map(int, s2_scales.split(',')))
         self.s2_scales.sort()
         self.s2_split_size = self.s2_scales[0]
         self.s2_image_size = self.s2_scales[-1]
 
-        super().__init__(model_name_or_path)
+        super().__init__(model_name_or_path, model_params)
 
         self.multiscale_forward = multiscale_forward
 
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
         self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
     
-    def load_model(self, device_map='auto'):
+    def load_model(self):
         if self.is_loaded:
             return
         self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
         self.image_processor.crop_size = self.image_processor.size
         self.vision_tower = SiglipVisionModel.from_pretrained(
             self.model_name_or_path,
-            device_map=device_map,
+            **self.model_params,
         )
         self.vision_tower.requires_grad_(False)
 
