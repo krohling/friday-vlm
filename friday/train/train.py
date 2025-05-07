@@ -282,6 +282,7 @@ def train():
     conversation_lib.default_conversation = conversation_lib.conv_templates["default"]
 
     data_module = make_supervised_data_module(tokenizer=tokenizer,
+                                              vision_tower=model.get_vision_tower(),
                                               data_args=config.data)
     
 

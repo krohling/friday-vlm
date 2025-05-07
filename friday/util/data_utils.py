@@ -379,9 +379,11 @@ class DataCollatorForSupervisedDataset(object):
 
 
 def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
+                                vision_tower,
                                 data_args) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = LazySupervisedDataset(tokenizer=tokenizer,
+                                          vision_tower=vision_tower,
                                           data_path=data_args.data_path,
                                           data_args=data_args)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)

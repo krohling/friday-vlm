@@ -18,4 +18,4 @@ cd Bunny-v1_0-data/pretrain
 tar -xvzf images.tar.gz
 rm images.tar.gz
 cd ..
-deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json
+# deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json
