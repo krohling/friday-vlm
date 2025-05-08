@@ -1,117 +1,118 @@
 {
-  "model": {
-    "language_model": {
-      "model_name_or_path": "microsoft/Phi-4-mini-reasoning",
-      "tokenizer_name_or_path": "kevin510/friday",
-      "freeze": true,
-      "tokenizer_params": {
-          "max_length": 1024,
-          "padding_side": "right",
-          "use_fast": true,
-          "trust_remote_code": true
+    "model": {
+      "language_model": {
+        "model_name_or_path": "microsoft/Phi-4-mini-reasoning",
+        "tokenizer_name_or_path": "kevin510/friday",
+        "freeze": true,
+        "tokenizer_params": {
+            "max_length": 1024,
+            "padding_side": "right",
+            "use_fast": true,
+            "trust_remote_code": true
+        },
+        "model_params": {
+            "use_cache": false,
+            "device_map": "cuda"
+        }
       },
-      "model_params": {
-          "use_cache": false,
-          "device_map": "cuda"
+      "vision_tower": {
+        "model_name_or_path": "google/siglip2-base-patch16-384",
+        "s2_scales": "384,768",
+        "use_s2": true,
+        "pad_to_square": true,
+        "freeze": true,
+        "model_params": {
+            "device_map": "cuda"
+        }
+      },
+      "vision_adapter": {
+        "input_dim": 1536,
+        "hidden_dim": 512,
+        "output_dim": 3072,
+        "num_layers": 2,
+        "activation": "gelu",
+        "checkpoint_path": null,
+        "freeze": false,
+        "device": "cuda"
       }
     },
-    "vision_tower": {
-      "model_name_or_path": "google/siglip2-base-patch16-384",
-      "s2_scales": "384,768",
-      "use_s2": true,
-      "pad_to_square": true,
-      "freeze": true,
-      "model_params": {
-          "device_map": "cuda"
-      }
+    "training": {
+        "local_rank": -1,
+        "cache_dir": null,
+        "optim": "adamw_torch",
+        "remove_unused_columns": false,
+        "freeze_mm_mlp_adapter": false,
+        "mpt_attn_impl": "triton",
+        "bf16": true,
+        "tf32": true,
+        "bits": 16,
+        "bits_and_bytes_params": {
+            "llm_int8_skip_modules": ["mm_projector"],
+            "llm_int8_threshold": 6.0,
+            "llm_int8_has_fp16_weight": false,
+            "bnb_4bit_use_double_quant": true,
+            "bnb_4bit_quant_type": "nf4"
+        },
+        "lora_enable": false,
+        "lora_params": {
+            "r": 64,
+            "alpha": 16,
+            "dropout": 0.05,
+            "bias": "none",
+            "weight_path": ""
+        },
+        "deepspeed": {
+            "fp16": {
+                "enabled": "auto",
+                "loss_scale": 0,
+                "loss_scale_window": 1000,
+                "initial_scale_power": 16,
+                "hysteresis": 2,
+                "min_loss_scale": 1
+            },
+            "bf16": {
+                "enabled": "auto"
+            },
+            "train_micro_batch_size_per_gpu": "auto",
+            "train_batch_size": "auto",
+            "gradient_accumulation_steps": "auto",
+            "zero_optimization": {
+                "stage": 2,
+                "overlap_comm": true,
+                "contiguous_gradients": true,
+                "sub_group_size": 1e9,
+                "reduce_bucket_size": "auto"
+            }
+        },
+        "eval_strategy": "no",
+        "lazy_preprocess": true,
+        "mm_projector_lr": null,
+        "group_by_modality_length": false,
+        "output_dir": "./checkpoints-pretrain/friday",
+        "num_train_epochs": 1,
+        "per_device_train_batch_size": 2,
+        "per_device_eval_batch_size": 1,
+        "gradient_accumulation_steps": 4,
+        "save_strategy": "steps",
+        "save_steps": 24000,
+        "save_total_limit": 1,
+        "learning_rate": 5e-4,
+        "weight_decay": 0.0,
+        "warmup_ratio": 0.03,
+        "lr_scheduler_type": "cosine",
+        "logging_steps": 1,
+        "gradient_checkpointing": true,
+        "dataloader_num_workers": 4,
+        "model_max_length": 1024,
+        "report_to": "none"
     },
-    "vision_adapter": {
-      "input_dim": 1536,
-      "hidden_dim": 512,
-      "output_dim": 3072,
-      "num_layers": 2,
-      "activation": "gelu",
-      "checkpoint_path": null,
-      "freeze": false,
-      "device": "cuda"
+    "data": {
+        "conversation_template": "plain",
+        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
+        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
+        "lazy_preprocess": false,
+        "is_multimodal": true,
+        "image_aspect_ratio": "square"
     }
-  },
-  "training": {
-      "local_rank": -1,
-      "cache_dir": null,
-      "optim": "adamw_torch",
-      "remove_unused_columns": false,
-      "freeze_mm_mlp_adapter": false,
-      "mpt_attn_impl": "triton",
-      "bf16": true,
-      "tf32": true,
-      "bits": 16,
-      "bits_and_bytes_params": {
-          "llm_int8_skip_modules": ["mm_projector"],
-          "llm_int8_threshold": 6.0,
-          "llm_int8_has_fp16_weight": false,
-          "bnb_4bit_use_double_quant": true,
-          "bnb_4bit_quant_type": "nf4"
-      },
-      "lora_enable": false,
-      "lora_params": {
-          "r": 64,
-          "alpha": 16,
-          "dropout": 0.05,
-          "bias": "none",
-          "weight_path": ""
-      },
-      "deepspeed": {
-          "fp16": {
-              "enabled": "auto",
-              "loss_scale": 0,
-              "loss_scale_window": 1000,
-              "initial_scale_power": 16,
-              "hysteresis": 2,
-              "min_loss_scale": 1
-          },
-          "bf16": {
-              "enabled": "auto"
-          },
-          "train_micro_batch_size_per_gpu": "auto",
-          "train_batch_size": "auto",
-          "gradient_accumulation_steps": "auto",
-          "zero_optimization": {
-              "stage": 2,
-              "overlap_comm": true,
-              "contiguous_gradients": true,
-              "sub_group_size": 1e9,
-              "reduce_bucket_size": "auto"
-          }
-      },
-      "eval_strategy": "no",
-      "lazy_preprocess": true,
-      "mm_projector_lr": null,
-      "group_by_modality_length": false,
-      "output_dir": "./checkpoints-pretrain/friday",
-      "num_train_epochs": 1,
-      "per_device_train_batch_size": 2,
-      "per_device_eval_batch_size": 1,
-      "gradient_accumulation_steps": 4,
-      "save_strategy": "steps",
-      "save_steps": 24000,
-      "save_total_limit": 1,
-      "learning_rate": 5e-4,
-      "weight_decay": 0.0,
-      "warmup_ratio": 0.03,
-      "lr_scheduler_type": "cosine",
-      "logging_steps": 1,
-      "gradient_checkpointing": true,
-      "dataloader_num_workers": 4,
-      "model_max_length": 1024,
-      "report_to": "none"
-  },
-  "data": {
-      "conversation_template": "plain",
-      "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
-      "image_folder": "./Bunny-v1_0-data/pretrain/images/",
-      "lazy_preprocess": false,
-      "is_multimodal": true,
-      "image_aspect_ratio": "square"
   }
-}
+  

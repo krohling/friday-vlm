@@ -279,17 +279,34 @@ def train():
 
 
     # ------ 5. Configure conversation and data module ------
-    conversation_lib.default_conversation = conversation_lib.conv_templates["default"]
 
-    data_module = make_supervised_data_module(tokenizer=tokenizer,
-                                              vision_tower=model.get_vision_tower(),
-                                              data_args=config.data)
+    from friday.train.data import PretrainingDataset, PretrainingCollator
+
+    # conversation_lib.default_conversation = conversation_lib.conv_templates["default"]
+
+    # data_module = make_supervised_data_module(tokenizer=tokenizer,
+    #                                           vision_tower=model.get_vision_tower(),
+    #                                           data_args=config.data)
+
+    train_dataset = PretrainingDataset(
+        data_path=config.data.data_path,
+        image_dir=config.data.image_dir,
+        tokenizer=tokenizer,
+        vision_tower=model.get_vision_tower(),
+    )
+
+    data_collator = PretrainingCollator(
+        tokenizer=tokenizer,
+    )
     
 
-    trainer = FridayTrainer(model=model,
-                           tokenizer=tokenizer,
-                           args=training_args,
-                           **data_module)
+    trainer = FridayTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        args=training_args,
+        train_dataset=train_dataset,
+        data_collator=data_collator,
+    )
 
     
     

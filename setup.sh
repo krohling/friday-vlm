@@ -1,4 +1,5 @@
 mkdir -p ~/miniconda3
+apt update
 apt install nvidia-cuda-toolkit git-lfs -y
 git lfs install
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
@@ -13,9 +14,10 @@ cd friday-vlm
 pip install -e . --no-build-isolation
 pip install --force-reinstall torchvision
 git clone https://huggingface.co/datasets/BoyaWu10/Bunny-v1_0-data
+rm -rf Bunny-v1_0-data/.git
 cat Bunny-v1_0-data/pretrain/images.tar.gz.part-* > Bunny-v1_0-data/pretrain/images.tar.gz
 cd Bunny-v1_0-data/pretrain
 tar -xvzf images.tar.gz
 rm images.tar.gz
-cd ..
+# cd ../..
 # deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json

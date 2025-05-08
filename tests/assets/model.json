@@ -9,7 +9,7 @@
             "trust_remote_code": true
         },
         "model_params": {
-            "use_cache": false,
+            "use_cache": true,
             "device_map": "cuda"
         }
     },

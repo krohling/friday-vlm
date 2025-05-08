@@ -261,6 +261,95 @@ def preprocess(
             return preprocess_friday_with_bos(sources, tokenizer, has_image=has_image)
 
 
+
+def preprocess_for_pretraining(
+        sample: dict, 
+        image_dir: str, 
+        vision_tower: torch.nn.Module, 
+        tokenizer: transformers.PreTrainedTokenizer
+    ) -> dict:
+    conversations = sample["conversations"]
+
+    assert 'image' in sample and sample['image'] is not None, "image must be provided for pretraining"
+    assert conversations[-1]["from"] == "gpt", "last turn must be assistant output"
+    
+    # 1) load and preprocess image
+    image_path = os.path.join(image_dir, sample['image'])
+    image = Image.open(image_path).convert('RGB')
+    image = vision_tower.preprocess_images([image], pad_and_stack_tensors=False)[0]
+
+    # 2) build the teacher‑forcing prompt: <image>  answer
+    prompt = IMAGE_TOKEN + conversations[-1]["value"]
+    input_ids = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        padding=False,
+        max_length=tokenizer.model_max_length
+    ).input_ids[0]
+
+    # 3) clone for labels and mask the <image> token
+    labels = input_ids.clone()
+    labels[0] = IGNORE_INDEX # ignore loss for <image> token
+
+    return {
+        "input_ids": input_ids, 
+        "labels": labels,
+        "image": image
+    }
+
+
+
+class PretrainingDataset(Dataset):
+    """Dataset for aligning vision adapter."""
+
+    def __init__(self, 
+            data_path: str,
+            image_dir: str,
+            tokenizer: transformers.PreTrainedTokenizer,
+            vision_tower,
+            data_args: DataArguments
+        ):
+        super(PretrainingDataset, self).__init__()
+        
+        self.image_dir = image_dir
+        self.tokenizer = tokenizer
+        self.vision_tower = vision_tower
+        self.samples = json.load(open(data_path, "r"))
+
+    def __len__(self):
+        return len(self.samples)
+
+    # @property
+    # def lengths(self):
+    #     length_list = []
+    #     for sample in self.samples:
+    #         img_tokens = 128 if 'image' in sample else 0
+    #         length_list.append(sum(len(conv['value'].split()) for conv in sample['conversations']) + img_tokens)
+    #     return length_list
+
+    # @property
+    # def modality_lengths(self):
+    #     length_list = []
+    #     for sample in self.samples:
+    #         cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
+    #         cur_len = cur_len if 'image' in sample else -cur_len
+    #         length_list.append(cur_len)
+    #     return length_list
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return preprocess_for_pretraining(
+            self.samples[i],
+            self.data_args.image_folder,
+            self.vision_tower,
+            self.tokenizer
+        )
+
+
+
+
+
+
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
@@ -308,7 +397,7 @@ class LazySupervisedDataset(Dataset):
             image_path = os.path.join(self.data_args.image_folder, source['image'])
             image = Image.open(image_path).convert('RGB')
             image = self.vision_tower.preprocess_images([image], pad_and_stack_tensors=False)[0]
-            source = preprocess_multimodal(copy.deepcopy(source['conversations']), self.data_args)
+            # source = preprocess_multimodal(copy.deepcopy(source['conversations']), self.data_args)
         else:
             source = copy.deepcopy(source['conversations'])
         

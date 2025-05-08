@@ -2,12 +2,14 @@ from .friday_arch import (
     build_tokenizer, 
     FridayConfig, 
     FridayModel, 
-    FridayForCausalLM
+    FridayForCausalLM,
+    DEFAULT_CFG_SPECIAL_TOKENS as SPECIAL_TOKENS
 )
 
 __all__ = [
     "build_tokenizer",
     "FridayConfig",
     "FridayModel",
-    "FridayForCausalLM"
+    "FridayForCausalLM",
+    "SPECIAL_TOKENS",
 ]
