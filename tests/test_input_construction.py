@@ -1,7 +1,7 @@
 # test_multimodal_input.py
 #
 # Unit‑tests for the “Multimodal Embedding & Input Construction” logic inside
-# friday.model.friday.FridayForCausalLM.
+# friday.model.FridayForCausalLM.
 #
 #  * Heavy language‑model, vision‑tower and adapter classes are replaced with
 #    tiny stubs so the whole file executes in <1 s on CPU.
@@ -59,12 +59,13 @@ def patch_friday(monkeypatch):
     monkeypatch.setattr(va, "MLPAdapter", DummyProjector, raising=True)
 
     # --- Patch FridayForCausalLM.__init__ with a lightweight version ------------- #
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
 
     def _light_init(self, config: FridayConfig):
+        torch.nn.Module.__init__(self)
         # store config / device
         self.config = config
-        self.device = torch.device("cpu")
+        self.to(torch.device("cpu"))
 
         hidden = 8
         vocab  = 1000
@@ -107,7 +108,7 @@ def patch_friday(monkeypatch):
 # reusable helper: build a lightweight Friday object
 @pytest.fixture
 def friday():
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
 
     cfg = FridayConfig(delay_load=True)
     return FridayForCausalLM(cfg)

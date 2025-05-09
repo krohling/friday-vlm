@@ -121,16 +121,17 @@ def patch_everything(monkeypatch):
 @pytest.fixture
 def friday(monkeypatch):
     """FridayForCausalLM with helper logic intact but zero heavy weights."""
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
 
     # patch FridayForCausalLM.__init__ to be minimal ------------------------- #
     def _light_init(self, config: FridayConfig):
+        torch.nn.Module.__init__(self)
         self.config = config
-        self.device = torch.device("cpu")
         self.embed_tokens = torch.nn.Embedding(100, 8)
         self.image_token_id = config.cfg_special_tokens["image_token_id"]
         self.image_start_id = config.cfg_special_tokens["image_start_token_id"]
         self.image_end_id   = config.cfg_special_tokens["image_end_token_id"]
+        self.to(torch.device("cpu"))
 
         class _Inner(torch.nn.Module):
             def __init__(self, outer):
@@ -152,7 +153,7 @@ def friday(monkeypatch):
         self.model = _Inner(self)
         self.lm_head = torch.nn.Linear(8, 100, bias=False)
 
-    monkeypatch.setattr("friday.model.friday.FridayForCausalLM.__init__", _light_init)
+    monkeypatch.setattr("friday.model.FridayForCausalLM.__init__", _light_init)
 
     return FridayForCausalLM(FridayConfig(delay_load=True))
 
@@ -191,9 +192,9 @@ def test_prepare_inputs_unsupported_type_raises(friday):
 # ---------------------------------------------------------------------------- #
 def test_build_tokenizer_adds_specials(monkeypatch):
     # Import *after* AutoTokenizer patch
-    from friday.model.friday import build_tokenizer
+    from friday.model import build_tokenizer
 
-    tok, specials = build_tokenizer("any-id")
+    tok, specials = build_tokenizer("kevin510/friday")
 
     expected = {"<image>", "<img_start>", "<img_end>"}
     # specials mapping keys may differ; we care about IDs presence & uniqueness

@@ -1,6 +1,6 @@
 # test_forward_pass.py
 #
-# “Full‑forward” subsystem tests for friday.model.friday.FridayForCausalLM
+# “Full‑forward” subsystem tests for friday.model.FridayForCausalLM
 # (only the control‑flow; *not* the real Phi or SigLIP weights).
 #
 # Heavy classes are monkey‑patched with light stubs so every test executes
@@ -14,6 +14,7 @@ from typing import List
 import pytest
 import torch
 from PIL import Image
+from torchvision import transforms
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 # --------------------------------------------------------------------------- #
@@ -30,6 +31,9 @@ class DummyVisionTower(torch.nn.Module):
     def forward(self, imgs):
         batch = imgs.shape[0] if torch.is_tensor(imgs) else len(imgs)
         return torch.zeros(batch, self.tokens, self.hidden)
+    
+    def preprocess_images(self, imgs: List[Image.Image], pad_and_stack_tensors=True) -> torch.Tensor:
+        return [transforms.ToTensor()(img) for img in imgs]
 
     @property
     def device(self):
@@ -64,11 +68,12 @@ def patch_heavy_stuff(monkeypatch):
     monkeypatch.setattr(va, "MLPAdapter", DummyAdapter, raising=True)
 
     # --- lightweight __init__ ---------------------------------------------------- #
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
 
     def _light_init(self, config: FridayConfig):
+        torch.nn.Module.__init__(self)
         self.config = config
-        self.device = torch.device("cpu")
+        self.to(torch.device("cpu"))
 
         hidden = 8
         vocab  = 1000
@@ -85,7 +90,7 @@ def patch_heavy_stuff(monkeypatch):
                 self.vision_tower = DummyVisionTower()
 
             def compute_image_features(self, imgs):
-                batch = imgs.shape[0]
+                batch = imgs.shape[0] if torch.is_tensor(imgs) else len(imgs)
                 return torch.zeros(batch, 1, 8)
 
             def get_vision_tower(self):
@@ -109,7 +114,7 @@ def patch_heavy_stuff(monkeypatch):
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def friday():
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
     cfg = FridayConfig(delay_load=True)
     return FridayForCausalLM(cfg)
 
@@ -125,10 +130,10 @@ def test_forward_no_images_equals_phi3(friday, monkeypatch):
     sentinel = object()
 
     # Mock the superclass forward to capture the call
-    import friday.model.friday as friday_mod
+    import friday.model.language_model.phi4 as lm_mod
     def _fake_phi3_forward(self, *a, **kw):
         return sentinel
-    monkeypatch.setattr(friday_mod.Phi3ForCausalLM, "forward", _fake_phi3_forward)
+    monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _fake_phi3_forward)
 
     out = friday.forward(input_ids=torch.tensor([[1, 2, 3]]))
     assert out is sentinel
@@ -139,14 +144,14 @@ def test_forward_no_images_equals_phi3(friday, monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_forward_with_images_runs(friday, monkeypatch):
     # Replace superclass forward with a dummy that makes logits of correct size
-    import friday.model.friday as friday_mod
+    import friday.model.language_model.phi4 as lm_mod
     def _dummy_phi3_forward(self, input_ids=None, inputs_embeds=None, **_kw):
         batch = inputs_embeds.shape[0]
         seq   = inputs_embeds.shape[1]
         vocab = self.lm_head.out_features
         logits = torch.zeros(batch, seq, vocab, requires_grad=True)
         return CausalLMOutputWithPast(logits=logits, past_key_values=None)
-    monkeypatch.setattr(friday_mod.Phi3ForCausalLM, "forward", _dummy_phi3_forward)
+    monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _dummy_phi3_forward)
 
     img_tok = friday.image_token_id
     ids = torch.tensor([[img_tok, 5]])
@@ -167,12 +172,12 @@ def test_cache_position_alignment(friday, monkeypatch):
     # capture the attention_mask that superclass receives
     captured = {}
 
-    import friday.model.friday as friday_mod
+    import friday.model.language_model.phi4 as lm_mod
     def _spy_phi3_forward(self, *a, **kw):
         captured['mask'] = kw.get("attention_mask")
         return CausalLMOutputWithPast(logits=torch.zeros(1, 1, 10))
 
-    monkeypatch.setattr(friday_mod.Phi3ForCausalLM, "forward", _spy_phi3_forward)
+    monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _spy_phi3_forward)
 
     # dummy past_key_values (len=5 sequence already cached)
     pkv_tensor = torch.zeros(1, 1, 5, 1)
@@ -197,12 +202,12 @@ def test_cache_position_alignment(friday, monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_gradients_flow_to_adapter_only(friday, monkeypatch):
     # Dummy superclass forward with differentiable logits
-    import friday.model.friday as friday_mod
+    import friday.model.language_model.phi4 as lm_mod
     def _grad_phi3_forward(self, input_ids=None, inputs_embeds=None, **kw):
         logits = self.lm_head(inputs_embeds)            # uses lm_head params
         return CausalLMOutputWithPast(logits=logits)
 
-    monkeypatch.setattr(friday_mod.Phi3ForCausalLM, "forward", _grad_phi3_forward)
+    monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _grad_phi3_forward)
 
     # Freeze language embeddings & vision tower; keep adapter trainable
     for p in friday.embed_tokens.parameters():

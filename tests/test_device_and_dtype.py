@@ -62,11 +62,12 @@ def patch_everything(monkeypatch):
                         raising=True)
 
     # Lightweight FridayForCausalLM.__init__
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
 
     def _light_init(self, config: FridayConfig):
+        torch.nn.Module.__init__(self)
         self.config = config
-        self.device = torch.device("cpu")
+        self.to(torch.device("cpu"))
 
         # tiny dummy inner model ------------------------------------------- #
         class _Inner(torch.nn.Module):
@@ -93,7 +94,7 @@ def patch_everything(monkeypatch):
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def friday():
-    from friday.model.friday import FridayForCausalLM, FridayConfig
+    from friday.model import FridayForCausalLM, FridayConfig
     return FridayForCausalLM(FridayConfig(delay_load=True))
 
 

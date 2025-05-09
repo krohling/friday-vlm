@@ -19,6 +19,8 @@ import pytest
 import torch
 from PIL import Image
 
+from util import test_images_paths
+
 # ---------------------------------------------------------------------------- #
 # ---------------------------  Lightweight stubs ----------------------------- #
 # ---------------------------------------------------------------------------- #
@@ -77,64 +79,51 @@ def patch_modules(monkeypatch):
 # ---------------------------------------------------------------------------- #
 # -----------------------  Helpers for temporary sample data ----------------- #
 # ---------------------------------------------------------------------------- #
-@pytest.fixture
-def tmp_images(tmp_path: Path):
-    """Create two tiny PNG files and return their names + directory."""
-    names = []
-    for idx in range(2):
-        img = Image.new("RGB", (8, 8), color=(255, 0, 0))
-        fname = tmp_path / f"img{idx}.png"
-        img.save(fname)
-        names.append(fname.name)
-    return tmp_path, names
-
 
 def _make_sample(img_file):
     return {
-        "image": img_file,
+        "image": str(img_file),
         "conversations": [
             {"from": "human", "value": "What is this?"},
             {"from": "gpt",   "value": " A red square."},
         ],
     }
 
-
 # ---------------------------------------------------------------------------- #
 # ---------------------------  7.1 preprocess_for_pretraining ---------------- #
 # ---------------------------------------------------------------------------- #
-def test_prompt_construction(tmp_images):
-    from friday.data import preprocess_for_pretraining  # adjust path if needed
+def test_prompt_construction(test_images_paths):
+    from friday.train.data import preprocess_for_pretraining
 
-    img_dir, (img,) = tmp_images
-    sample = _make_sample(img)
+    sample = _make_sample(test_images_paths[0])
 
     tokenizer = DummyTokenizer()
     vtower = DummyVisionTower()
 
-    out = preprocess_for_pretraining(sample, str(img_dir), vtower, tokenizer)
+    out = preprocess_for_pretraining(sample, str(test_images_paths[0].parent), vtower, tokenizer)
 
     img_tok_id = tokenizer.vocab["<image>"]
     # first token(s) equal <image>
     assert (out["input_ids"][:1] == img_tok_id).all()
 
 
-def test_label_masking(tmp_images):
-    from friday.data import preprocess_for_pretraining
+def test_label_masking(test_images_paths):
+    from friday.train.data import preprocess_for_pretraining
 
-    img_dir, (img,) = tmp_images
-    sample = _make_sample(img)
+    sample = _make_sample(test_images_paths[0])
 
     tokenizer = DummyTokenizer()
     vtower = DummyVisionTower()
-    out = preprocess_for_pretraining(sample, str(img_dir), vtower, tokenizer)
+    out = preprocess_for_pretraining(sample, str(test_images_paths[0].parent), vtower, tokenizer)
 
     img_tok_id = tokenizer.vocab["<image>"]
     mask_positions = out["input_ids"] == img_tok_id
+
     assert torch.all(out["labels"][mask_positions] == -100)   # IGNORE_INDEX
 
 
 def test_missing_image_assert(tmp_path):
-    from friday.data import preprocess_for_pretraining
+    from friday.train.data import preprocess_for_pretraining
 
     sample = {
         "image": None,
@@ -151,17 +140,17 @@ def test_missing_image_assert(tmp_path):
 # -----------------------------  7.2 PretrainingDataset ---------------------- #
 # ---------------------------------------------------------------------------- #
 @pytest.fixture
-def json_dataset(tmp_path: Path, tmp_images):
+def json_dataset(tmp_path: Path, test_images_paths):
     """Write a JSON file with two samples and return its path."""
-    img_dir, (img0, img1) = tmp_images
+    img0, img1 = test_images_paths
     samples = [_make_sample(img0), _make_sample(img1)]
     json_path = tmp_path / "samples.json"
     json_path.write_text(json.dumps(samples))
-    return json_path, img_dir, len(samples)
+    return json_path, img0.parent, len(samples)
 
 
 def test_len_matches_json(json_dataset):
-    from friday.data import PretrainingDataset                          # path?
+    from friday.train.data import PretrainingDataset
 
     json_path, img_dir, N = json_dataset
     ds = PretrainingDataset(
@@ -174,7 +163,7 @@ def test_len_matches_json(json_dataset):
 
 
 def test_get_item_keys_types(json_dataset):
-    from friday.data import PretrainingDataset
+    from friday.train.data import PretrainingDataset
 
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(
@@ -193,16 +182,17 @@ def test_get_item_keys_types(json_dataset):
 # ---------------------------------------------------------------------------- #
 # -----------------------------  7.3 PretrainingCollator --------------------- #
 # ---------------------------------------------------------------------------- #
-from friday.data import PretrainingCollator        # ensure import after patch
+# from friday.train.data import PretrainingCollator        # ensure import after patch
 
 def _build_batch(ds, idxs):
     return [ds[i] for i in idxs]
 
 
 def test_padding_and_attention_mask(json_dataset):
+    from friday.train.data import PretrainingDataset, PretrainingCollator
     json_path, img_dir, _ = json_dataset
     tok = DummyTokenizer()
-    ds = __import__("friday.data").data.PretrainingDataset(
+    ds = PretrainingDataset(
         data_path=str(json_path),
         image_dir=str(img_dir),
         tokenizer=tok,
@@ -220,12 +210,13 @@ def test_padding_and_attention_mask(json_dataset):
 
 
 def test_eos_pad_roundtrip(json_dataset):
+    from friday.train.data import PretrainingDataset, PretrainingCollator
     # make tokenizer where pad==eos
     tok = DummyTokenizer(pad_id=2, eos_id=2)
     collator = PretrainingCollator(tokenizer=tok)
 
     json_path, img_dir, _ = json_dataset
-    ds = __import__("friday.data").data.PretrainingDataset(
+    ds = PretrainingDataset(
         data_path=str(json_path),
         image_dir=str(img_dir),
         tokenizer=tok,
@@ -239,9 +230,10 @@ def test_eos_pad_roundtrip(json_dataset):
 
 
 def test_image_list_batch_size(json_dataset):
+    from friday.train.data import PretrainingDataset, PretrainingCollator
     tok = DummyTokenizer()
     json_path, img_dir, _ = json_dataset
-    ds = __import__("friday.data").data.PretrainingDataset(
+    ds = PretrainingDataset(
         data_path=str(json_path),
         image_dir=str(img_dir),
         tokenizer=tok,

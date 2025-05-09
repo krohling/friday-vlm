@@ -112,13 +112,13 @@ def patch_siglip(monkeypatch):
 @pytest.fixture
 def tower():
     from friday.model.vision_tower import SiglipVisionTower
-    return SiglipVisionTower(model_name_or_path="stub", pad_to_square=True)
+    return SiglipVisionTower(model_name_or_path="google/siglip2-base-patch16-384", pad_to_square=True)
 
 
 @pytest.fixture
 def tower_s2():
     from friday.model.vision_tower import SiglipVisionTowerS2
-    return SiglipVisionTowerS2(model_name_or_path="stub", s2_scales="256,384")
+    return SiglipVisionTowerS2(model_name_or_path="google/siglip2-base-patch16-384", s2_scales="256,384")
 
 
 # --------------------------------------------------------------------------- #
@@ -141,7 +141,7 @@ def test_preprocess_pad_to_square(tower):
 
 def test_forward_single_tensor_shape(tower):
     img = _dummy_pil(384, 384)
-    tensor = tower.preprocess_images([img], pad_and_stack_tensors=False)
+    tensor = tower.preprocess_images([img], pad_and_stack_tensors=True)
     feats = tower(tensor)                                      # (B, P, H)
 
     expected_patches = (384 // tower.vision_tower.config.patch_size) ** 2
@@ -151,7 +151,7 @@ def test_forward_single_tensor_shape(tower):
 
 def test_forward_list_batching(tower):
     imgs = [_dummy_pil(384, 384) for _ in range(3)]
-    tensors = [tower.preprocess_images([im], pad_and_stack_tensors=False)
+    tensors = [tower.preprocess_images([im], pad_and_stack_tensors=False)[0]
                for im in imgs]
 
     feats_list = tower(tensors)                                # list len 3
@@ -163,7 +163,7 @@ def test_forward_list_batching(tower):
 
 def test_dtype_and_device_passthrough(tower):
     img = _dummy_pil(384, 384)
-    tensor = tower.preprocess_images([img], pad_and_stack_tensors=False)
+    tensor = tower.preprocess_images([img], pad_and_stack_tensors=True)
     feats = tower(tensor)
 
     assert feats.dtype == tower.dtype
@@ -175,7 +175,7 @@ def test_dtype_and_device_passthrough(tower):
 # --------------------------------------------------------------------------- #
 def test_multiscale_concat_order(tower_s2):
     side = tower_s2.s2_image_size                              # largest scale
-    img_tensor = torch.zeros(3, side, side)
+    img_tensor = torch.zeros(1, 3, side, side)
 
     feats = tower_s2(img_tensor)
     # hidden dim should be hidden_size * n_scales
@@ -189,7 +189,7 @@ def test_multiscale_concat_order(tower_s2):
 
 def test_split_tiling_invariance(tower_s2):
     side = tower_s2.s2_image_size
-    img_tensor = torch.zeros(3, side, side)
+    img_tensor = torch.zeros(1, 3, side, side)
 
     multi = tower_s2(img_tensor)
     # simulate “no‑tiling” reference

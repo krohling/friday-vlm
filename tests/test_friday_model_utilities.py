@@ -1,6 +1,6 @@
 # test_friday_model_utils.py
 #
-# Unit‑tests for the utility helpers inside friday.model.friday.FridayModel.
+# Unit‑tests for the utility helpers inside friday.model.FridayModel.
 # Heavyweight vision‑tower / adapter classes are monkey‑patched with small
 # dummy modules so tests run in <1 s on CPU.
 #
@@ -72,7 +72,7 @@ def patch_friday_modules(monkeypatch):
 @pytest.fixture
 def friday_model():
     """Return a FridayModel with very small dims and delay_load=True."""
-    from friday.model.friday import FridayModel, FridayConfig
+    from friday.model import FridayModel, FridayConfig
 
     cfg = FridayConfig(delay_load=True)
     cfg.cfg_vision_adapter.update(dict(input_dim=16, hidden_dim=8, output_dim=32))

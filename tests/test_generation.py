@@ -5,6 +5,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from PIL import Image
 from friday.model import FridayForCausalLM
+from util import test_images
 
 USE_FRIDAY = True
 
@@ -47,12 +48,6 @@ def model_and_tokenizer():
     pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
     return model, tokenizer, pipe
 
-@pytest.fixture(scope="module")
-def images():
-    image_1 = Image.open("tests/assets/cat_1.jpeg").convert("RGB")
-    image_2 = Image.open("tests/assets/cat_2.jpg").convert("RGB")
-    return image_1, image_2
-
 GEN_ARGS = {
     "max_new_tokens": 100,
     "return_full_text": False,
@@ -80,9 +75,9 @@ def test_basic_text(model_and_tokenizer):
     ])
     assert isinstance(results[0], str)
 
-def test_single_image(model_and_tokenizer, images):
+def test_single_image(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, _ = images
+    image_1 = test_images[0]
     results = run_batch(pipe, [
         {
             "messages": [
@@ -94,9 +89,9 @@ def test_single_image(model_and_tokenizer, images):
     ])
     assert isinstance(results[0], str)
 
-def test_single_image_preprocessed(model_and_tokenizer, images):
+def test_single_image_preprocessed(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, _ = images
+    image_1, _ = test_images[0]
     results = run_batch(pipe, [
         {
             "messages": [
@@ -108,9 +103,9 @@ def test_single_image_preprocessed(model_and_tokenizer, images):
     ])
     assert isinstance(results[0], str)
 
-def test_two_images(model_and_tokenizer, images):
+def test_two_images(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, image_2 = images
+    image_1, image_2 = test_images[0], test_images[1]
     results = run_batch(pipe, [
         {
             "messages": [
@@ -122,9 +117,9 @@ def test_two_images(model_and_tokenizer, images):
     ])
     assert isinstance(results[0], str)
 
-def test_two_images_preprocessed(model_and_tokenizer, images):
+def test_two_images_preprocessed(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, image_2 = images
+    image_1, image_2 = test_images[0], test_images[1]
     results = run_batch(pipe, [
         {
             "messages": [
@@ -150,9 +145,9 @@ def test_missing_image_1(model_and_tokenizer):
     ])
     assert isinstance(results[0], str)
 
-def test_missing_image_2(model_and_tokenizer, images):
+def test_missing_image_2(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, _ = images
+    image_1 = test_images[0]
     with pytest.raises(ValueError):
         run_batch(pipe, [
             {
@@ -186,9 +181,9 @@ def test_batch_no_images(model_and_tokenizer):
     assert all(isinstance(r, str) for r in results)
 
 
-def test_batch_text_and_images(model_and_tokenizer, images):
+def test_batch_text_and_images(model_and_tokenizer, test_images):
     _, _, pipe = model_and_tokenizer
-    image_1, image_2 = images
+    image_1, image_2 = test_images[0], test_images[1]
     results = run_batch(pipe, [
         {
             "messages": [
@@ -215,9 +210,9 @@ def test_batch_text_and_images(model_and_tokenizer, images):
     assert all(isinstance(r, str) for r in results)
 
 
-def test_batch_preprocessed_images(model_and_tokenizer, images):
+def test_batch_preprocessed_images(model_and_tokenizer, test_images):
     model, _, pipe = model_and_tokenizer
-    image_1, image_2 = images
+    image_1, image_2 = test_images[0], test_images[1]
     results = run_batch(pipe, [
         {
             "messages": [
