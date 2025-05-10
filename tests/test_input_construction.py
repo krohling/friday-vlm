@@ -125,18 +125,21 @@ def test_embedding_injection_single_img(friday):
     ids = torch.tensor([10, image_tok, 11])
 
     # one image → shape (1, 1, 4)
-    image_feats = [torch.zeros(1, 1, 4)]
+    # image_size = friday.model.vision_tower.vision_tower.config.image_size
+    # patch_dim = (image_size // friday.model.vision_tower.vision_tower.config.patch_size) ** 2
+    embedding_dim = friday.config.cfg_vision_adapter["output_dim"]
+    image_feats = [torch.zeros(1, 1, embedding_dim)]
 
     embeds, labels = friday.get_multimodal_input_embeddings(
         [ids], image_feats, return_labels=True
     )
 
-    # The single sequence should expand: 3 original tokens → 5 embeddings
     #   10  <img_start> [patch] <img_end> 11
     assert embeds[0].shape[0] == 5
 
     # Label positions 1‑3 (img_start, patch, img_end) must be masked out
     masked = labels[0][1:4]
+    #   1: <img_start> 2: [patch] 3: <img_end>
     assert torch.all(masked == IGNORE_INDEX)
     # Others keep original ids
     assert labels[0][0].item() == 10 and labels[0][-1].item() == 11
@@ -151,21 +154,35 @@ def test_mismatch_token_count_raises(friday):
 
 def test_multiple_images_in_batch(friday):
     img_tok = friday.image_token_id
+    embedding_dim = friday.config.cfg_vision_adapter["output_dim"]
     batch_ids = [
         torch.tensor([1, img_tok, 2]),                        # 1 image
         torch.tensor([3, img_tok, 4, img_tok, 5])            # 2 images
     ]
     image_feats = [
-        torch.zeros(1, 1, 4),                                # for first row
-        torch.zeros(2, 1, 4),                                # for second row
+        torch.zeros(1, 1, embedding_dim),                                # for first row
+        torch.zeros(2, 1, embedding_dim),                                # for second row
     ]
     embeds, labels = friday.get_multimodal_input_embeddings(
         batch_ids, image_feats, return_labels=True
     )
 
     # correct per‑row lengths
-    assert embeds[0].shape[0] == 5           # 1-> 1+2 extra
-    assert embeds[1].shape[0] == 8           # 2-> 2*2 extra
+    assert embeds[0].shape[0] == 2 + (1 * 3) # 2 tokens + 1 image
+    assert embeds[1].shape[0] == 3 + (2 * 3) # 3 tokens + 2 images
+
+    # correct label values
+    assert labels[0][0].item() == 1 and labels[0][-1].item() == 2
+    assert labels[1][0].item() == 3 and labels[1][4].item() == 4 and labels[1][-1].item() == 5
+
+    # Label positions 1‑3 (img_start, patch, img_end) must be masked out
+    masked = labels[0][1:4]
+    assert torch.all(masked == -100)
+    masked = labels[1][1:4]
+    assert torch.all(masked == -100)
+    masked = labels[1][5:8]
+    assert torch.all(masked == -100)
+    
 
 
 # ---------------------------------------------------------------------------------- #
