@@ -188,6 +188,7 @@ def train():
         **bnb_model_from_pretrained_args,
         **config.model.language_model.model_params,
     )
+    model.initialize_vision_modules()
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         config.model.language_model.tokenizer_name_or_path,
@@ -197,11 +198,6 @@ def train():
 
     if tokenizer.unk_token is not None and tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.unk_token
-    
-    model.initialize_vision_modules()
-    model.set_language_model_requires_grad(not config.model.language_model.freeze)
-    model.set_vision_tower_requires_grad(not config.model.vision_tower.freeze)
-    model.set_vision_adapter_requires_grad(not config.model.vision_adapter.freeze)
 
 
     

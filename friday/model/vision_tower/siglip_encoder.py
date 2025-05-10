@@ -20,6 +20,10 @@ class SiglipVisionTower(nn.Module):
         self.select_layer = -2
         self.load_model()
 
+    @property
+    def output_dim(self):
+        return self.vision_tower.config.hidden_size if self.vision_tower else None
+    
     def load_model(self):
         if self.is_loaded:
             return
@@ -40,7 +44,7 @@ class SiglipVisionTower(nn.Module):
         imgs = [self.image_processor(img, return_tensors="pt")['pixel_values'][0] for img in imgs]
 
         if pad_and_stack_tensors:
-            imgs = pad_and_stack(imgs)
+            imgs = pad_and_stack(imgs, pad_value=0.0)
             imgs = imgs.to(dtype=torch.float32, device=self.device)
         
         return imgs
@@ -107,6 +111,10 @@ class SiglipVisionTowerS2(SiglipVisionTower):
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
         self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
     
+    @property
+    def output_dim(self):
+        return (2*self.vision_tower.config.hidden_size) if self.vision_tower else None
+
     def load_model(self):
         if self.is_loaded:
             return
@@ -124,7 +132,6 @@ class SiglipVisionTowerS2(SiglipVisionTower):
         self.is_loaded = True
 
     def forward_feature(self, images):
-        print(f"images: {images.shape}")
         image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype),
                                                output_hidden_states=True)
         image_features = self.feature_select(image_forward_outs).to(images.dtype)

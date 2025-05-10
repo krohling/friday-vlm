@@ -38,34 +38,84 @@ DEFAULT_CFG_VISION_TOWER = {
     "s2_scales": "384,768",
     "use_s2": True,
     "pad_to_square": True,
+    "freeze": False,
 }
 DEFAULT_CFG_VISION_ADAPTER = {
     "input_dim": 1536,
     "hidden_dim": 512,
     "output_dim": 3072,
     "layers": 2,
-    "activation": "gelu"
+    "activation": "gelu",
+    "freeze": False,
 }
 
 
 class FridayConfig(Phi3Config):
     model_type = "friday-phi"
 
-    def __init__(self, delay_load=True, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, 
+            base_model_name_or_path: str | None = "microsoft/Phi-4-mini-instruct",
+            delay_load=True, 
+            freeze_llm=False, 
+            **kwargs
+        ):
+        base_kwargs = {}
+        if base_model_name_or_path is not None:
+            base_cfg = AutoConfig.from_pretrained(
+                base_model_name_or_path,
+                trust_remote_code=True,   # Phi‑4 uses custom code in the repo
+            )
+            base_kwargs = base_cfg.to_dict()
 
+        merged = {**base_kwargs, **kwargs}
         self.delay_load = delay_load
-        self.cfg_vision_tower = DEFAULT_CFG_VISION_TOWER.copy()
+        self.freeze_llm = freeze_llm
+
+        self._cfg_vision_tower = DEFAULT_CFG_VISION_TOWER.copy()
         if "cfg_vision_tower" in kwargs:
-            self.cfg_vision_tower.update(kwargs["cfg_vision_tower"])
+            self._cfg_vision_tower.update(kwargs["cfg_vision_tower"])
 
-        self.cfg_vision_adapter = DEFAULT_CFG_VISION_ADAPTER.copy()
+        self._cfg_vision_adapter = DEFAULT_CFG_VISION_ADAPTER.copy()
         if "cfg_vision_adapter" in kwargs:
-            self.cfg_vision_adapter.update(kwargs["cfg_vision_adapter"])
+            self._cfg_vision_adapter.update(kwargs["cfg_vision_adapter"])
 
-        self.cfg_special_tokens = DEFAULT_CFG_SPECIAL_TOKENS.copy()
+        self._cfg_special_tokens = DEFAULT_CFG_SPECIAL_TOKENS.copy()
         if "cfg_special_tokens" in kwargs:
-            self.cfg_special_tokens.update(kwargs["cfg_special_tokens"])
+            self._cfg_special_tokens.update(kwargs["cfg_special_tokens"])
+
+        super().__init__(**merged)
+        
+    
+    @property
+    def cfg_vision_tower(self):
+        return self._cfg_vision_tower
+
+    @cfg_vision_tower.setter
+    def cfg_vision_tower(self, value):
+        if not value:
+            raise ValueError("Name cannot be empty")
+        self._cfg_vision_tower.update(value)
+    
+
+    @property
+    def cfg_vision_adapter(self):
+        return self._cfg_vision_adapter
+    
+    @cfg_vision_adapter.setter
+    def cfg_vision_adapter(self, value):
+        if not value:
+            raise ValueError("Name cannot be empty")
+        self._cfg_vision_adapter.update(value)
+    
+    @property
+    def cfg_special_tokens(self):
+        return self._cfg_special_tokens
+    
+    @cfg_special_tokens.setter
+    def cfg_special_tokens(self, value):
+        if not value:
+            raise ValueError("Name cannot be empty")
+        self._cfg_special_tokens.update(value)
 
 
 class FridayModel(Phi3Model):
@@ -96,19 +146,15 @@ class FridayModel(Phi3Model):
         
         self.vision_tower.load_model()
         self.mm_projector = MLPAdapter(**self.cfg_vision_adapter)
+
+        self.set_vision_tower_requires_grad(not self.cfg_vision_tower["freeze"])
+        self.set_vision_adapter_requires_grad(not self.cfg_vision_adapter["freeze"])
     
     def compute_image_features(self, imgs: torch.Tensor) -> torch.Tensor:
         features = self.vision_tower(imgs)
         if isinstance(features, list):
             features = torch.stack(features, dim=1)
         return self.mm_projector(features)
-
-    def set_vision_adapter_requires_grad(self, requires_grad: bool):
-        if self.mm_projector is not None:
-            for param in self.mm_projector.parameters():
-                param.requires_grad = requires_grad
-        else:
-            raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
     
     def set_vision_tower_requires_grad(self, requires_grad: bool):
         if self.vision_tower is not None:
@@ -116,6 +162,13 @@ class FridayModel(Phi3Model):
                 param.requires_grad = requires_grad
         else:
             raise ValueError("Vision tower is not initialized. Please call initialize_vision_modules() first.")
+    
+    def set_vision_adapter_requires_grad(self, requires_grad: bool):
+        if self.mm_projector is not None:
+            for param in self.mm_projector.parameters():
+                param.requires_grad = requires_grad
+        else:
+            raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
 
 
 class FridayForCausalLM(Phi3ForCausalLM):
@@ -123,26 +176,31 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
     def __init__(self, config: FridayConfig):
         super().__init__(config)
-        self.config = config
-        self.model = FridayModel(config)
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.post_init()
 
+        self.config = config
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.image_token_id = config.cfg_special_tokens["image_token_id"]
         self.image_start_id       = config.cfg_special_tokens["image_start_token_id"]
         self.image_end_id         = config.cfg_special_tokens["image_end_token_id"]
+
+        self.model = FridayModel(config)
+        self.post_init()
+        if config.freeze_llm:
+            self.set_language_model_requires_grad(False)
     
     def get_model(self) -> FridayModel:
         return self.model
     
     def get_vision_tower(self) -> SiglipVisionTower:
         return self.model.get_vision_tower()
+    
+    def get_vision_adapter(self) -> MLPAdapter:
+        return self.model.mm_projector
 
     def set_language_model_requires_grad(self, requires_grad: bool):
-        for param in self.model.parameters():
-            param.requires_grad = requires_grad
-        for param in self.lm_head.parameters():
-            param.requires_grad = requires_grad
+        for n, p in self.named_parameters():
+            if "vision_tower" not in n and "mm_projector" not in n:
+                p.requires_grad = requires_grad
     
     def set_vision_tower_requires_grad(self, requires_grad: bool):
         self.model.set_vision_tower_requires_grad(requires_grad)
@@ -203,7 +261,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
                 tail = item_ids[cursor:]
                 emb_parts.append(self.model.embed_tokens(tail))
                 lbl_parts.append(tail)
-
+            
             embeds_list.append(torch.cat(emb_parts, dim=0))
             labels_list.append(torch.cat(lbl_parts, dim=0))
     
@@ -223,7 +281,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
         # if we have already processed images and are in a streaming step we can skip the multimodal processing
         # but we need to ensure the attention mask and position ids are correct
 
-        if past_key_values is not None and input_ids.shape[1] == 1:
+        if past_key_values is not None and attention_mask is not None and input_ids.shape[1] == 1:
             tgt = past_key_values[-1][-1].shape[-2] + 1
             attention_mask = torch.cat(
                 [attention_mask,

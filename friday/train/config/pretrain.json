@@ -3,7 +3,7 @@
       "language_model": {
         "model_name_or_path": "microsoft/Phi-4-mini-reasoning",
         "tokenizer_name_or_path": "kevin510/friday",
-        "freeze": true,
+        "freeze_llm": true,
         "tokenizer_params": {
             "max_length": 1024,
             "padding_side": "right",

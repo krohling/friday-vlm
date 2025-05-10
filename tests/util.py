@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def test_images_paths():
     current_file_path = Path(__file__).resolve()
     return [
@@ -10,6 +10,6 @@ def test_images_paths():
         current_file_path.parent / "assets" / "cat_2.jpeg"
     ]
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def test_images(test_images_paths):
     return [Image.open(p).convert("RGB") for p in test_images_paths]

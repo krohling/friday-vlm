@@ -14,7 +14,7 @@ from .utils import split_chessboard, merge_chessboard, batched_forward
 def forward(model, input, scales=None, img_sizes=None, max_split_size=None, resize_output_to_idx=0, num_prefix_token=0,
             output_shape='bnc', split_forward=False):
 
-    print(f"Input shape: {input.shape}")
+    # print(f"Input shape: {input.shape}")
 
     assert input.dim() == 4, "Input image must be in the shape of BxCxHxW."
     assert input.shape[2] == input.shape[3], "Currently only square images are supported."

@@ -17,97 +17,6 @@ from PIL import Image
 from torchvision import transforms
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-# --------------------------------------------------------------------------- #
-# -----------------------------  Dummy building blocks ---------------------- #
-# --------------------------------------------------------------------------- #
-class DummyVisionTower(torch.nn.Module):
-    """Returns a fixed zero tensor; has one fake parameter for .parameters()."""
-    def __init__(self, tokens=4, hidden=8):
-        super().__init__()
-        self.tokens = tokens
-        self.hidden = hidden
-        self.weight = torch.nn.Parameter(torch.zeros(1))
-
-    def forward(self, imgs):
-        batch = imgs.shape[0] if torch.is_tensor(imgs) else len(imgs)
-        return torch.zeros(batch, self.tokens, self.hidden)
-    
-    def preprocess_images(self, imgs: List[Image.Image], pad_and_stack_tensors=True) -> torch.Tensor:
-        return [transforms.ToTensor()(img) for img in imgs]
-
-    @property
-    def device(self):
-        return torch.device("cpu")
-
-
-class DummyAdapter(torch.nn.Module):
-    """Small linear projector so grads can flow."""
-    def __init__(self, input_dim=8, output_dim=8):
-        super().__init__()
-        self.output_dim = output_dim
-        self.lin = torch.nn.Linear(input_dim, output_dim, bias=False)
-
-    def forward(self, x):
-        return self.lin(x)
-
-
-# --------------------------------------------------------------------------- #
-# -------------------------  Global auto‑patch fixture ---------------------- #
-# --------------------------------------------------------------------------- #
-@pytest.fixture(autouse=True)
-def patch_heavy_stuff(monkeypatch):
-    """
-    *Before* any Friday classes are imported, replace heavy sub‑modules with
-    light stubs; patch FridayForCausalLM.__init__ with a lightweight version.
-    """
-    # --- vision tower / adapter -------------------------------------------------- #
-    import friday.model.vision_tower as vt
-    import friday.model.vision_adapter as va
-    monkeypatch.setattr(vt, "SiglipVisionTower", DummyVisionTower, raising=True)
-    monkeypatch.setattr(vt, "SiglipVisionTowerS2", DummyVisionTower, raising=True)
-    monkeypatch.setattr(va, "MLPAdapter", DummyAdapter, raising=True)
-
-    # --- lightweight __init__ ---------------------------------------------------- #
-    from friday.model import FridayForCausalLM, FridayConfig
-
-    def _light_init(self, config: FridayConfig):
-        torch.nn.Module.__init__(self)
-        self.config = config
-        self.to(torch.device("cpu"))
-
-        hidden = 8
-        vocab  = 1000
-        config.hidden_size = hidden
-        self.embed_tokens = torch.nn.Embedding(vocab, hidden)
-        self.lm_head = torch.nn.Linear(hidden, vocab, bias=False)
-
-        # minimal inner model holding vision‑tower & adapter
-        class _Inner(torch.nn.Module):
-            def __init__(self, outer):
-                super().__init__()
-                self.embed_tokens = outer.embed_tokens
-                self.mm_projector = DummyAdapter(input_dim=8, output_dim=8)
-                self.vision_tower = DummyVisionTower()
-
-            def compute_image_features(self, imgs):
-                batch = imgs.shape[0] if torch.is_tensor(imgs) else len(imgs)
-                return torch.zeros(batch, 1, 8)
-
-            def get_vision_tower(self):
-                return self.vision_tower
-
-            def parameters(self, recurse=True):
-                return []
-
-        self.model = _Inner(self)
-
-        # expose special token IDs used by helper logic
-        self.image_token_id = config.cfg_special_tokens["image_token_id"]
-        self.image_start_id = config.cfg_special_tokens["image_start_token_id"]
-        self.image_end_id   = config.cfg_special_tokens["image_end_token_id"]
-
-    monkeypatch.setattr(FridayForCausalLM, "__init__", _light_init, raising=True)
-
 
 # --------------------------------------------------------------------------- #
 # ------------------------  Helper factories / utilities -------------------- #
@@ -115,8 +24,11 @@ def patch_heavy_stuff(monkeypatch):
 @pytest.fixture
 def friday():
     from friday.model import FridayForCausalLM, FridayConfig
+
     cfg = FridayConfig(delay_load=True)
-    return FridayForCausalLM(cfg)
+    model = FridayForCausalLM(cfg)
+    model.initialize_vision_modules()
+    return model
 
 
 def _dummy_pil():
@@ -154,7 +66,7 @@ def test_forward_with_images_runs(friday, monkeypatch):
     monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _dummy_phi3_forward)
 
     img_tok = friday.image_token_id
-    ids = torch.tensor([[img_tok, 5]])
+    ids = torch.tensor([[img_tok]])
     out = friday.forward(
         input_ids=ids,
         images=[_dummy_pil()],          # one PIL image
@@ -181,6 +93,7 @@ def test_cache_position_alignment(friday, monkeypatch):
 
     # dummy past_key_values (len=5 sequence already cached)
     pkv_tensor = torch.zeros(1, 1, 5, 1)
+    prev_attention_mask = torch.zeros(1, 5)
     past_key_values = [(pkv_tensor, pkv_tensor)]
 
     img_tok = friday.image_token_id
@@ -188,6 +101,7 @@ def test_cache_position_alignment(friday, monkeypatch):
         input_ids=torch.tensor([[img_tok]]),
         images=[_dummy_pil()],
         past_key_values=past_key_values,
+        attention_mask=prev_attention_mask,
     )
 
     new_mask = captured['mask']
@@ -200,24 +114,11 @@ def test_cache_position_alignment(friday, monkeypatch):
 # --------------------------------------------------------------------------- #
 # 4. Gradients flow only through adapter when everything else frozen
 # --------------------------------------------------------------------------- #
-def test_gradients_flow_to_adapter_only(friday, monkeypatch):
-    # Dummy superclass forward with differentiable logits
-    import friday.model.language_model.phi4 as lm_mod
-    def _grad_phi3_forward(self, input_ids=None, inputs_embeds=None, **kw):
-        logits = self.lm_head(inputs_embeds)            # uses lm_head params
-        return CausalLMOutputWithPast(logits=logits)
-
-    monkeypatch.setattr(lm_mod.Phi3ForCausalLM, "forward", _grad_phi3_forward)
-
+def test_gradients_flow_to_adapter_only(friday):
     # Freeze language embeddings & vision tower; keep adapter trainable
-    for p in friday.embed_tokens.parameters():
-        p.requires_grad_(False)
-    for p in friday.lm_head.parameters():
-        p.requires_grad_(False)
-    for p in friday.model.vision_tower.parameters():
-        p.requires_grad_(False)
-    for p in friday.model.mm_projector.parameters():
-        p.requires_grad_(True)
+    friday.set_language_model_requires_grad(False)
+    friday.set_vision_tower_requires_grad(False)
+    friday.set_vision_adapter_requires_grad(True)
 
     # Forward + backward with a dummy loss
     img_tok = friday.image_token_id
@@ -230,7 +131,8 @@ def test_gradients_flow_to_adapter_only(friday, monkeypatch):
     loss.backward()
 
     # Adapter should have grads; others should not
-    assert all(p.grad is not None for p in friday.model.mm_projector.parameters())
-    assert all(p.grad is None for p in friday.embed_tokens.parameters())
-    assert all(p.grad is None for p in friday.lm_head.parameters())
-    assert all(p.grad is None for p in friday.model.vision_tower.parameters())
+    for n, p in friday.named_parameters():
+        if "mm_projector" in n:
+            assert p.grad is not None
+        else:
+            assert p.grad is None
