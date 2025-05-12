@@ -249,6 +249,16 @@ class FridayTrainer(Trainer):
             if self.args.local_rank == 0 or self.args.local_rank == -1:
                 self.model.config.save_pretrained(output_dir)
                 torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
+
+                if getattr(self.args, "report", None) == "wandb":
+                    # 1. zip the checkpoint folder
+                    import shutil
+                    shutil.make_archive(output_dir, 'zip', output_dir)
+                    # 2. upload the zip file to wandb
+                    import wandb
+                    wandb.save(os.path.join(output_dir, f'{checkpoint_folder}.zip'), base_path=output_dir)
+                    # 3. remove the zip file
+                    os.remove(os.path.join(output_dir, f'{checkpoint_folder}.zip'))
         else:
             super(FridayTrainer, self)._save_checkpoint(model, trial, metrics)
 
