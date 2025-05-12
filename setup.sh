@@ -21,5 +21,4 @@ tar -xvzf images.tar.gz
 rm images.tar.gz
 cd ../..
 pytest -s
-# cd ../..
 # deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json
