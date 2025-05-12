@@ -4,7 +4,7 @@ from torch.nn.functional import cross_entropy
 from PIL import Image
 from friday.train.data import PretrainingDataset, PretrainingCollator
 
-STEPS   = 50
+STEPS   = 60
 TARGET  = 0.05
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs GPU")
