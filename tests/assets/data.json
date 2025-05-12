@@ -1,0 +1,20 @@
+[
+    {
+        "image": "cat_1.jpg",
+        "conversations": [
+            {
+                "from": "gpt",
+                "value": "This is a cat"
+            }
+        ]
+    },
+    {
+        "image": "cat_2.jpg",
+        "conversations": [
+            {
+                "from": "gpt",
+                "value": "The image contains a cat"
+            }
+        ]
+    }
+]
