@@ -169,6 +169,20 @@ class FridayModel(Phi3Model):
                 param.requires_grad = requires_grad
         else:
             raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
+    
+    def set_vision_tower_dtype(self, dtype: torch.dtype):
+        if self.vision_tower is not None:
+            for p in self.vision_tower.parameters():
+                p.data = p.data.to(dtype)
+        else:
+            raise ValueError("Vision tower is not initialized. Please call initialize_vision_modules() first.")
+    
+    def set_vision_adapter_dtype(self, dtype: torch.dtype):
+        if self.mm_projector is not None:
+            for p in self.mm_projector.parameters():
+                p.data = p.data.to(dtype)
+        else:
+            raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
 
 
 class FridayForCausalLM(Phi3ForCausalLM):
@@ -209,6 +223,19 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
     def set_vision_adapter_requires_grad(self, requires_grad: bool):
         self.model.set_vision_adapter_requires_grad(requires_grad)
+    
+    def set_language_model_dtype(self, dtype: torch.dtype):
+        for p in self.get_llm_parameters():
+            p.data = p.data.to(dtype)
+        self.lm_head = self.lm_head.to(dtype)
+
+    def set_vision_tower_dtype(self, dtype: torch.dtype):
+        self.model.set_vision_tower_dtype(dtype)
+    
+    def set_vision_adapter_dtype(self, dtype: torch.dtype):
+        self.model.set_vision_adapter_dtype(dtype)
+    
+    
     
     def initialize_vision_modules(self):
         self.model.initialize_vision_modules()
@@ -454,8 +481,8 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
             if cache_position is not None and inputs_embeds is not None and cache_position.shape[0] != inputs_embeds.shape[1]:
                 cache_position = torch.arange(inputs_embeds.shape[1], device=self.device)
-            
-
+        
+        
         return Phi3ForCausalLM.forward(
             self,
             input_ids=input_ids,
@@ -481,7 +508,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
             print("LLM parameters have not been initialized")
         
         if self.get_model().vision_tower is not None:
-            print(f"Vision tower device: {self.get_model().vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
+            print(f"Vision tower device: {self.get_model().vision_tower.vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
         else:
             print("Vision tower parameters have not been initialized")
 
