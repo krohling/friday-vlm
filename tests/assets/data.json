@@ -1,6 +1,6 @@
 [
     {
-        "image": "cat_1.jpg",
+        "image": "cat_1.jpeg",
         "conversations": [
             {
                 "from": "gpt",
@@ -9,7 +9,7 @@
         ]
     },
     {
-        "image": "cat_2.jpg",
+        "image": "cat_2.jpeg",
         "conversations": [
             {
                 "from": "gpt",
