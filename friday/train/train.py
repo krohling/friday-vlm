@@ -289,6 +289,7 @@ def train():
         image_dir=config.data.image_dir,
         tokenizer=tokenizer,
         vision_tower=model.get_vision_tower(),
+        max_count=config.data.max_count,
     )
 
     data_collator = PretrainingCollator(

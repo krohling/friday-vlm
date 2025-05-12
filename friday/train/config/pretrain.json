@@ -112,7 +112,8 @@
         "image_dir": "./Bunny-v1_0-data/pretrain/images/",
         "lazy_preprocess": false,
         "is_multimodal": true,
-        "image_aspect_ratio": "square"
+        "image_aspect_ratio": "square",
+        "max_count": 600000
     }
   }
   

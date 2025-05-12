@@ -68,6 +68,7 @@ class PretrainingDataset(Dataset):
             image_dir: str,
             tokenizer: transformers.PreTrainedTokenizer,
             vision_tower,
+            max_count: int = None
         ):
         super(PretrainingDataset, self).__init__()
         
@@ -75,6 +76,8 @@ class PretrainingDataset(Dataset):
         self.tokenizer = tokenizer
         self.vision_tower = vision_tower
         self.samples = json.load(open(data_path, "r"))
+        if max_count is not None:
+            self.samples = self.samples[:max_count]
 
     def __len__(self):
         return len(self.samples)

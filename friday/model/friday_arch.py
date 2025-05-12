@@ -197,10 +197,12 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def get_vision_adapter(self) -> MLPAdapter:
         return self.model.mm_projector
 
+    def get_llm_parameters(self):
+        return [p for n, p in self.named_parameters() if "vision_tower" not in n and "mm_projector" not in n]
+
     def set_language_model_requires_grad(self, requires_grad: bool):
-        for n, p in self.named_parameters():
-            if "vision_tower" not in n and "mm_projector" not in n:
-                p.requires_grad = requires_grad
+        for p in self.get_llm_parameters():
+            p.requires_grad = requires_grad
     
     def set_vision_tower_requires_grad(self, requires_grad: bool):
         self.model.set_vision_tower_requires_grad(requires_grad)
@@ -473,8 +475,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
     
     def print_device_configuration(self):
         print("*************Device Configuration*********")
-        print(f"Model device: {self.device} dtype: {set({p.dtype for p in self.parameters()})}")
-        print(f"FridayModel device: {self.get_model().device} dtype: {set({p.dtype for p in self.get_model().parameters()})}")
+        print(f"LLM device: {self.get_llm_parameters()[0].device} dtype: {set({p.dtype for p in self.get_llm_parameters()})}")
         print(f"Vision tower device: {self.get_model().vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
         print(f"MM Projector device: {get_module_device(self.get_model().mm_projector)} dtype: {set({p.dtype for p in self.get_model().mm_projector.parameters()})}")
         print("******************************************")
