@@ -3,25 +3,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 @dataclass
-class ModelArguments:
-    model_name_or_path: Optional[str] = field(default=None)
-    model_type: Optional[str] = field(default=None)
-    version: Optional[str] = field(default=None)
-
-    vision_tower: Optional[str] = field(default=None)
-    disable_s2: bool = field(default=False)
-    s2_scales: Optional[str] = field(default='384,768')
-
-    freeze_backbone: bool = field(default=False)
-    tune_mm_mlp_adapter: bool = field(default=False)
-
-    
-
-    unfreeze_vision_tower: bool = field(default=False)
-    pretrain_mm_mlp_adapter: Optional[str] = field(default=None)
-    mm_projector_type: Optional[str] = field(default='mlp2x_gelu')
-
-@dataclass
 class DataArguments:
     data_path: str = field(default=None, metadata={"help": "Path to the training data."})
     lazy_preprocess: bool = False
@@ -72,3 +53,10 @@ class FridayTrainingArguments(transformers.TrainingArguments):
     group_by_modality_length: bool = field(default=False)
     bits_and_bytes_params: dict = field(default_factory=dict)
     lora_params: dict = field(default_factory=dict)
+    save_only_mm_projector: bool = field(
+        default=False,
+        metadata={
+            "help":
+                "If true, only save the multimodal projector. This is useful for training the projector separately."
+        },
+    )

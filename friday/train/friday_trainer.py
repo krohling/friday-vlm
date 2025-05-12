@@ -230,7 +230,9 @@ class FridayTrainer(Trainer):
         return self.optimizer
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
+        print("_save_checkpoint")
+        print(f"getattr(self.args, 'save_only_mm_projector', False): {getattr(self.args, 'save_only_mm_projector', False)}")
+        if getattr(self.args, 'save_only_mm_projector', False):
             from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
             checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -251,7 +253,8 @@ class FridayTrainer(Trainer):
             super(FridayTrainer, self)._save_checkpoint(model, trial, metrics)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
+        print("_save")
+        if getattr(self.args, 'save_only_mm_projector', False):
             pass
         else:
             super(FridayTrainer, self)._save(output_dir, state_dict)

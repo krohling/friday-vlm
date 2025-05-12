@@ -16,7 +16,7 @@ from friday.train.friday_trainer import FridayTrainer
 from friday import conversation as conversation_lib
 from friday.model import *
 from friday.util.data_utils import make_supervised_data_module
-from friday.train.config import ModelArguments, FridayTrainingArguments, DataArguments
+from friday.train.config import FridayTrainingArguments, DataArguments
 
 local_rank = None
 
