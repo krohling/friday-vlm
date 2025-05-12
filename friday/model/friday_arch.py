@@ -475,9 +475,20 @@ class FridayForCausalLM(Phi3ForCausalLM):
     
     def print_device_configuration(self):
         print("*************Device Configuration*********")
-        print(f"LLM device: {self.get_llm_parameters()[0].device} dtype: {set({p.dtype for p in self.get_llm_parameters()})}")
-        print(f"Vision tower device: {self.get_model().vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
-        print(f"MM Projector device: {get_module_device(self.get_model().mm_projector)} dtype: {set({p.dtype for p in self.get_model().mm_projector.parameters()})}")
+        if len(self.get_llm_parameters()) > 0:
+            print(f"LLM device: {self.get_llm_parameters()[0].device} dtype: {set({p.dtype for p in self.get_llm_parameters()})}")
+        else:
+            print("LLM parameters have not been initialized")
+        
+        if self.get_model().vision_tower is not None:
+            print(f"Vision tower device: {self.get_model().vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
+        else:
+            print("Vision tower parameters have not been initialized")
+
+        if self.get_model().mm_projector is not None:
+            print(f"MM Projector device: {get_module_device(self.get_model().mm_projector)} dtype: {set({p.dtype for p in self.get_model().mm_projector.parameters()})}")
+        else:
+            print("MM Projector parameters have not been initialized")
         print("******************************************")
 
 
