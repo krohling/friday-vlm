@@ -56,7 +56,6 @@ class FridayConfig(Phi3Config):
     def __init__(self, 
             base_model_name_or_path: str | None = "microsoft/Phi-4-mini-instruct",
             delay_load=True, 
-            freeze_llm=False, 
             **kwargs
         ):
         base_kwargs = {}
@@ -69,7 +68,6 @@ class FridayConfig(Phi3Config):
 
         merged = {**base_kwargs, **kwargs}
         self.delay_load = delay_load
-        self.freeze_llm = freeze_llm
 
         self._cfg_vision_tower = DEFAULT_CFG_VISION_TOWER.copy()
         if "cfg_vision_tower" in kwargs:
@@ -183,6 +181,18 @@ class FridayModel(Phi3Model):
                 p.data = p.data.to(dtype)
         else:
             raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
+    
+    def is_vision_tower_frozen(self):
+        if self.vision_tower is not None:
+            return all(not p.requires_grad for p in self.vision_tower.parameters())
+        else:
+            raise ValueError("Vision tower is not initialized. Please call initialize_vision_modules() first.")
+    
+    def is_vision_adapter_frozen(self):
+        if self.mm_projector is not None:
+            return all(not p.requires_grad for p in self.mm_projector.parameters())
+        else:
+            raise ValueError("Vision adapter is not initialized. Please call initialize_vision_modules() first.")
 
 
 class FridayForCausalLM(Phi3ForCausalLM):
@@ -199,8 +209,6 @@ class FridayForCausalLM(Phi3ForCausalLM):
 
         self.model = FridayModel(config)
         self.post_init()
-        if config.freeze_llm:
-            self.set_language_model_requires_grad(False)
     
     def get_model(self) -> FridayModel:
         return self.model
@@ -227,13 +235,21 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def set_language_model_dtype(self, dtype: torch.dtype):
         for p in self.get_llm_parameters():
             p.data = p.data.to(dtype)
-        self.lm_head = self.lm_head.to(dtype)
 
     def set_vision_tower_dtype(self, dtype: torch.dtype):
         self.model.set_vision_tower_dtype(dtype)
     
     def set_vision_adapter_dtype(self, dtype: torch.dtype):
         self.model.set_vision_adapter_dtype(dtype)
+    
+    def is_llm_frozen(self):
+        return all(not p.requires_grad for p in self.get_llm_parameters())
+    
+    def is_vision_tower_frozen(self):
+        return self.model.is_vision_tower_frozen()
+    
+    def is_vision_adapter_frozen(self):
+        return self.model.is_vision_adapter_frozen()
     
     
     
@@ -503,17 +519,23 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def print_device_configuration(self):
         print("*************Device Configuration*********")
         if len(self.get_llm_parameters()) > 0:
-            print(f"LLM device: {self.get_llm_parameters()[0].device} dtype: {set({p.dtype for p in self.get_llm_parameters()})}")
+            llm_device = self.get_llm_parameters()[0].device
+            llm_dtype = set({p.dtype for p in self.get_llm_parameters()})
+            print(f"LLM Parameters:\t\t\tdevice: {llm_device}\tdtype: {llm_dtype}\tfrozen: {self.is_llm_frozen()}")
         else:
             print("LLM parameters have not been initialized")
         
         if self.get_model().vision_tower is not None:
-            print(f"Vision tower device: {self.get_model().vision_tower.vision_tower.device} dtype: {set({p.dtype for p in self.get_model().vision_tower.parameters()})}")
+            vt_device = self.get_model().vision_tower.vision_tower.device
+            vt_dtype = set({p.dtype for p in self.get_model().vision_tower.parameters()})
+            print(f"Vision Tower Parameters:\tdevice: {vt_device}\tdtype: {vt_dtype}\tfrozen: {self.is_vision_tower_frozen()}")
         else:
             print("Vision tower parameters have not been initialized")
 
         if self.get_model().mm_projector is not None:
-            print(f"MM Projector device: {get_module_device(self.get_model().mm_projector)} dtype: {set({p.dtype for p in self.get_model().mm_projector.parameters()})}")
+            mm_device = get_module_device(self.get_model().mm_projector)
+            mm_dtype = set({p.dtype for p in self.get_model().mm_projector.parameters()})
+            print(f"MM Projector Parameters:\tdevice: {mm_device}\tdtype: {mm_dtype}\tfrozen: {self.is_vision_adapter_frozen()}")
         else:
             print("MM Projector parameters have not been initialized")
         print("******************************************")

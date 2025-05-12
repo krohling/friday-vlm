@@ -252,6 +252,14 @@ def train():
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
     
+
+    if config.model.language_model.freeze:
+        model.set_language_model_requires_grad(False)
+    if config.model.vision_tower.freeze:
+        model.set_vision_tower_requires_grad(False)
+    if config.model.vision_adapter.freeze:
+        model.set_vision_adapter_requires_grad(False)
+
     model.print_device_configuration()
     
     

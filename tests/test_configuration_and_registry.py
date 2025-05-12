@@ -106,48 +106,12 @@ def test_instantiate_with_auto_config():
     
     assert isinstance(model, FridayForCausalLM)
     assert isinstance(model.config, FridayConfig)
-
-
-
-# --------------------------------------------------------------------------- #
-# 4. Test freeze behaviour
-# --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(
-    "freeze_llm, freeze_vision_tower, freeze_vision_adapter",
-    [
-        (True, True, True),  # all freeze
-        (False, False, False),  # all unfreeze
-        (True, False, False),  # LLM freeze, others unfreeze
-        (False, True, True),  # LLM unfreeze, others freeze
-    ],
-)
-def test_friday_config_freeze(
-    freeze_llm, freeze_vision_tower, freeze_vision_adapter
-):
-    """Instantiate the model and confirm that frozen parameters have requires_grad disabled."""
-    cfg = FridayConfig(
-        freeze_llm=freeze_llm,
-        cfg_vision_tower={"freeze": freeze_vision_tower},
-        cfg_vision_adapter={"freeze": freeze_vision_adapter},        
-    )
-
-    model = FridayForCausalLM(cfg)
-    model.initialize_vision_modules()
-
-    for name, param in model.named_parameters():
-        if "vision_tower" in name:
-            assert param.requires_grad == (not freeze_vision_tower)
-        elif "mm_projector" in name:
-            assert param.requires_grad == (not freeze_vision_adapter)
-        else:
-            assert param.requires_grad == (not freeze_llm)
     
     
 
 
-
 # --------------------------------------------------------------------------- #
-# 5. HuggingFace Auto* class registry integration
+# 4. HuggingFace Auto* class registry integration
 # --------------------------------------------------------------------------- #
 def test_auto_registry(monkeypatch):
     """Ensure the config & model classes are discoverable through the HF Auto API.
