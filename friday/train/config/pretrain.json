@@ -94,7 +94,7 @@
         "per_device_eval_batch_size": 1,
         "gradient_accumulation_steps": 4,
         "save_strategy": "steps",
-        "save_steps": 10,
+        "save_steps": 5,
         "save_total_limit": 1,
         "save_only_mm_projector": true,
         "learning_rate": 5e-4,

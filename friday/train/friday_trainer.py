@@ -1,5 +1,6 @@
 import os
 import torch
+import shutil
 
 from torch.utils.data import Sampler
 from torch import nn
@@ -230,8 +231,6 @@ class FridayTrainer(Trainer):
         return self.optimizer
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        print("_save_checkpoint")
-        print(f"getattr(self.args, 'save_only_mm_projector', False): {getattr(self.args, 'save_only_mm_projector', False)}")
         if getattr(self.args, 'save_only_mm_projector', False):
             from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
             checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
@@ -250,20 +249,27 @@ class FridayTrainer(Trainer):
                 self.model.config.save_pretrained(output_dir)
                 torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
 
-                if getattr(self.args, "report", None) == "wandb":
+                if "wandb" in getattr(self.args, "report_to", []):
                     # 1. zip the checkpoint folder
-                    import shutil
                     shutil.make_archive(output_dir, 'zip', output_dir)
                     # 2. upload the zip file to wandb
                     import wandb
-                    wandb.save(os.path.join(output_dir, f'{checkpoint_folder}.zip'), base_path=output_dir)
-                    # 3. remove the zip file
-                    os.remove(os.path.join(output_dir, f'{checkpoint_folder}.zip'))
+                    artifact = wandb.Artifact(
+                        name="mm_projector",
+                        type="model",
+                        description="MM‑projector only, frozen backbone",
+                        metadata={
+                            "global_step": self.state.global_step,
+                            "epoch": self.state.epoch,
+                            **self.state.log_history[-1],
+                        },
+                    )
+                    artifact.add_file(os.path.join(run_dir, f'{checkpoint_folder}.zip'))
+                    wandb.log_artifact(artifact)
         else:
             super(FridayTrainer, self)._save_checkpoint(model, trial, metrics)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        print("_save")
         if getattr(self.args, 'save_only_mm_projector', False):
             pass
         else:
