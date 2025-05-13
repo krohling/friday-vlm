@@ -118,18 +118,10 @@ class SiglipVisionTowerS2(SiglipVisionTower):
     def load_model(self):
         if self.is_loaded:
             return
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
-        self.image_processor.crop_size = self.image_processor.size
-        self.vision_tower = SiglipVisionModel.from_pretrained(
-            self.model_name_or_path,
-            **self.model_params,
-        )
-        self.vision_tower.requires_grad_(False)
-
+        
+        super().load_model()
         self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
         self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
-
-        self.is_loaded = True
 
     def forward_feature(self, images):
         image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype),
@@ -141,12 +133,20 @@ class SiglipVisionTowerS2(SiglipVisionTower):
         if type(images) is list:
             image_features = []
             for image in images:
-                image_feature = self.multiscale_forward(self.forward_feature, image.unsqueeze(0),
-                                                        img_sizes=self.s2_scales, max_split_size=self.s2_split_size)
+                image_feature = self.multiscale_forward(
+                    self.forward_feature, 
+                    image.unsqueeze(0),
+                    img_sizes=self.s2_scales, 
+                    max_split_size=self.s2_split_size
+                )
                 image_features.append(image_feature)
         else:
-            image_features = self.multiscale_forward(self.forward_feature, images, img_sizes=self.s2_scales,
-                                                     max_split_size=self.s2_split_size)
+            image_features = self.multiscale_forward(
+                self.forward_feature, 
+                images, 
+                img_sizes=self.s2_scales,
+                max_split_size=self.s2_split_size
+            )
 
         return image_features
 
