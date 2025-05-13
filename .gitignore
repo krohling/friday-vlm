@@ -1,5 +1,6 @@
-exclude/
 .DS_Store
+exclude/
+wandb/
 LLaVA-CC3M-Pretrain-595K/
 checkpoints-*/
 Bunny-v1_0-data/

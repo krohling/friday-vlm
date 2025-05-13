@@ -248,6 +248,9 @@ class FridayTrainer(Trainer):
             if self.args.local_rank == 0 or self.args.local_rank == -1:
                 self.model.config.save_pretrained(output_dir)
                 torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
+                self.state.save_to_json(
+                    os.path.join(output_dir, "trainer_state.json")
+                )
 
                 if "wandb" in getattr(self.args, "report_to", []):
                     # 1. zip the checkpoint folder
