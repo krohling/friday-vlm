@@ -17,93 +17,6 @@ import pytest
 import torch
 from PIL import Image
 
-# ---------------------------------------------------------------------------------- #
-# ----------------------------  Dummy helper classes  ------------------------------ #
-# ---------------------------------------------------------------------------------- #
-# class DummyProjector(torch.nn.Module):
-#     """Stand‑in for MLPAdapter; returns all‑zero projections."""
-#     def __init__(self, output_dim: int = 4):
-#         super().__init__()
-#         self.output_dim = output_dim
-
-#     def forward(self, x):
-#         shape = (*x.shape[:-1], self.output_dim)
-#         return torch.zeros(shape, dtype=x.dtype, device=x.device)
-
-
-# class DummyVisionTower:
-#     """Stand‑in for a Siglip tower with a trivial `preprocess_images`."""
-#     def __init__(self):
-#         # minimal attributes used by Friday code
-#         self.device = torch.device("cpu")
-
-#     def preprocess_images(self, imgs: List[Image.Image], pad_and_stack_tensors=True):
-#         # produce a (N,3,32,32) tensor filled with zeros
-#         return torch.zeros(len(imgs), 3, 32, 32)
-
-# # ---------------------------------------------------------------------------------- #
-# # ----------------------------  Lightweight model patching ------------------------- #
-# # ---------------------------------------------------------------------------------- #
-# @pytest.fixture(autouse=True)
-# def patch_friday(monkeypatch):
-#     """
-#     Before importing `FridayForCausalLM`, patch away heavyweight components so
-#     its helper methods can be unit‑tested with tiny tensors.
-#     """
-#     # --- Patch the vision‑related classes ---------------------------------------- #
-#     import friday.model.vision_tower as vt
-#     import friday.model.vision_adapter as va
-
-#     monkeypatch.setattr(vt, "SiglipVisionTower", DummyVisionTower, raising=True)
-#     monkeypatch.setattr(vt, "SiglipVisionTowerS2", DummyVisionTower, raising=True)
-#     monkeypatch.setattr(va, "MLPAdapter", DummyProjector, raising=True)
-
-#     # --- Patch FridayForCausalLM.__init__ with a lightweight version ------------- #
-#     from friday.model import FridayForCausalLM, FridayConfig
-
-#     def _light_init(self, config: FridayConfig):
-#         torch.nn.Module.__init__(self)
-#         # store config / device
-#         self.config = config
-#         self.to(torch.device("cpu"))
-
-#         hidden = 8
-#         vocab  = 1000
-#         config.hidden_size = hidden
-
-#         # tiny embedding layer used by get_multimodal_input_embeddings
-#         self.embed_tokens = torch.nn.Embedding(vocab, hidden)
-
-#         # build a “mini‑inner model” carrying only the attributes used by helpers
-#         class _Inner(torch.nn.Module):
-#             def __init__(self, outer):
-#                 super().__init__()
-#                 self.embed_tokens = outer.embed_tokens
-#                 self.mm_projector = DummyProjector(output_dim=4)
-#                 self.vision_tower = DummyVisionTower()
-
-#             # very small image‑feature generator: (N, 1, 4) zeros
-#             def compute_image_features(self, imgs):
-#                 n_imgs = imgs.shape[0] if torch.is_tensor(imgs) else len(imgs)
-#                 return torch.zeros(n_imgs, 1, 4)
-
-#             # required by FridayForCausalLM.get_vision_tower()
-#             def get_vision_tower(self):
-#                 return self.vision_tower
-
-#             def parameters(self, recurse=True):
-#                 return []
-
-#         self.model = _Inner(self)
-#         self.lm_head = torch.nn.Linear(hidden, vocab, bias=False)
-
-#         # copy special‑token IDs onto the outer object (helpers rely on these)
-#         self.image_token_id  = config.cfg_special_tokens["image_token_id"]
-#         self.image_start_id  = config.cfg_special_tokens["image_start_token_id"]
-#         self.image_end_id    = config.cfg_special_tokens["image_end_token_id"]
-
-#     monkeypatch.setattr(FridayForCausalLM, "__init__", _light_init, raising=True)
-
 
 # reusable helper: build a lightweight Friday object
 @pytest.fixture
@@ -124,9 +37,6 @@ def test_embedding_injection_single_img(friday):
     image_tok = friday.image_token_id
     ids = torch.tensor([10, image_tok, 11])
 
-    # one image → shape (1, 1, 4)
-    # image_size = friday.model.vision_tower.vision_tower.config.image_size
-    # patch_dim = (image_size // friday.model.vision_tower.vision_tower.config.patch_size) ** 2
     embedding_dim = friday.config.cfg_vision_adapter["output_dim"]
     image_feats = [torch.zeros(1, 1, embedding_dim)]
 

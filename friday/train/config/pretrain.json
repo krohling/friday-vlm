@@ -5,7 +5,7 @@
         "tokenizer_name_or_path": "kevin510/friday",
         "freeze": true,
         "tokenizer_params": {
-            "max_length": 1024,
+            "model_max_length": 1024,
             "padding_side": "right",
             "use_fast": true,
             "trust_remote_code": true

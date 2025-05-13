@@ -11,8 +11,9 @@ conda activate friday
 conda install pytorch torchvision -c pytorch -y
 git clone https://github.com/krohling/friday-vlm.git
 cd friday-vlm
-pip install -e . --no-build-isolation
+# pip install -e torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121 -c constraints.txt
 # pip install -e . --extra-index-url https://download.pytorch.org/whl/cu121 -c constraints.txt
+pip install -e . --no-build-isolation
 pip install --force-reinstall torchvision
 git clone https://huggingface.co/datasets/BoyaWu10/Bunny-v1_0-data
 rm -rf Bunny-v1_0-data/.git
