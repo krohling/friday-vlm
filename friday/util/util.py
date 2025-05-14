@@ -3,20 +3,6 @@ import torch.nn.functional as F
 
 from PIL import Image
 
-def get_module_device(module: torch.nn.Module) -> torch.device:
-    """Return the device where the module’s first parameter/buffer lives.
-
-    If the module has no parameters or buffers (rare), default to CPU."""
-    # parameters() is an iterator, so we only pull the first
-    try:
-        return next(module.parameters()).device
-    except StopIteration:
-        # e.g. an empty container module
-        try:
-            return next(module.buffers()).device
-        except StopIteration:
-            return torch.device("cpu")
-
 def expand2square(pil_img, background_color):
     width, height = pil_img.size
     if width == height:

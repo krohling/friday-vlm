@@ -92,13 +92,6 @@ def patch_everything(monkeypatch):
     monkeypatch.setattr(const, "IMG_END_TOKEN",   "<img_end>",   raising=True)
     monkeypatch.setattr(const, "IGNORE_INDEX", -100,             raising=True)
 
-    # --- Friday util device helper (for print_device_configuration) -------- #
-    import friday.util as futil
-    monkeypatch.setattr(futil, "get_module_device",
-                        lambda m: next(m.parameters()).device
-                        if any(True for _ in m.parameters()) else torch.device("cpu"),
-                        raising=True)
-
     # --- Light stubs for vision tower & adapter ---------------------------- #
     import friday.model.vision_tower as vt
     import friday.model.vision_adapter as va

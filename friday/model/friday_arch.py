@@ -12,7 +12,7 @@ import PIL
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from friday.util import pad_and_stack, expand2square, get_module_device
+from friday.util import pad_and_stack
 from friday.model.vision_adapter import MLPAdapter
 from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
 from friday.model.language_model.phi4 import (
@@ -519,21 +519,21 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def print_device_configuration(self):
         print("*************Device Configuration*********")
         if len(self.get_llm_parameters()) > 0:
-            llm_device = self.get_llm_parameters()[0].device
+            llm_device = set({str(p.device) for p in self.get_llm_parameters()})
             llm_dtype = set({p.dtype for p in self.get_llm_parameters()})
             print(f"LLM Parameters:\t\t\tdevice: {llm_device}\tdtype: {llm_dtype}\tfrozen: {self.is_llm_frozen()}")
         else:
             print("LLM parameters have not been initialized")
         
         if self.get_model().vision_tower is not None:
-            vt_device = self.get_model().vision_tower.vision_tower.device
+            vt_device = set({str(p.device) for p in self.get_model().vision_tower.parameters()})
             vt_dtype = set({p.dtype for p in self.get_model().vision_tower.parameters()})
             print(f"Vision Tower Parameters:\tdevice: {vt_device}\tdtype: {vt_dtype}\tfrozen: {self.is_vision_tower_frozen()}")
         else:
             print("Vision tower parameters have not been initialized")
 
         if self.get_model().mm_projector is not None:
-            mm_device = get_module_device(self.get_model().mm_projector)
+            mm_device = set({str(p.device) for p in self.get_model().mm_projector.parameters()})
             mm_dtype = set({p.dtype for p in self.get_model().mm_projector.parameters()})
             print(f"MM Projector Parameters:\tdevice: {mm_device}\tdtype: {mm_dtype}\tfrozen: {self.is_vision_adapter_frozen()}")
         else:
