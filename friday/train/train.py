@@ -143,6 +143,7 @@ def train():
     parser.add_argument('--config', type=str, help='The path to the config json file')
     parser.add_argument('--deepspeed', type=str, help='The path to the deepspeed config json file')
     parser.add_argument('--local_rank', type=int, help='The local rank for distributed training', default=-1)
+    parser.add_argument('--resume_from_checkpoint', type=str, help='The path to the checkpoint to resume from', default=None)
     args = parser.parse_args()
     local_rank = args.local_rank
 
@@ -178,6 +179,11 @@ def train():
 
 
     # ------ 2. Load model, tokenizer, and vision tower ------
+    if args.resume_from_checkpoint:
+        adapter_checkpoint = os.path.join(args.resume_from_checkpoint, 'mm_projector.bin')
+        if os.path.exists(adapter_checkpoint):
+            config.model.vision_adapter["checkpoint_path"] = adapter_checkpoint
+
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     model = FridayForCausalLM.from_pretrained(
         config.model.language_model.model_name_or_path,
@@ -326,7 +332,8 @@ def train():
     #     trainer.train(resume_from_checkpoint=True)
     # else:
     #     trainer.train()
-    trainer.train()
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+    # trainer.train()
     trainer.save_state()
 
     model.config.use_cache = True

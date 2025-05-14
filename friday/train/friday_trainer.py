@@ -232,21 +232,28 @@ class FridayTrainer(Trainer):
     
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        super()._save_checkpoint(model, trial, metrics)
+        super()._save_checkpoint(model, trial)
 
         if self.args.local_rank in (0, -1):
             if "wandb" in getattr(self.args, "report_to", []):
-                # 1. zip the checkpoint folder
+                # 1. setup directories
                 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
                 checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
                 run_dir = self._get_output_dir(trial=trial)
                 output_dir = os.path.join(run_dir, checkpoint_folder)
+
+                # 2. delete the full weight checkpoint
+                full_wts_ckpt = os.path.join(output_dir, f"global_step{self.state.global_step}", "mp_rank_00_model_states.pt")
+                if os.path.exists(full_wts_ckpt):
+                    os.remove(full_wts_ckpt)
+
+                # 3. zip the checkpoint folder
                 zip_path = shutil.make_archive(output_dir, 'zip', output_dir)
 
                 # 2. upload the zip file to wandb
                 import wandb
                 artifact = wandb.Artifact(
-                    name="mm_projector",
+                    name="checkpoint",
                     type="model",
                     description="MM-projector only, frozen backbone",
                     metadata={
@@ -261,7 +268,6 @@ class FridayTrainer(Trainer):
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         # super()._save(output_dir, state_dict)
-
         if getattr(self.args, 'save_only_mm_projector', False):
             if self.args.local_rank == 0 or self.args.local_rank == -1:
                 self.model.config.save_pretrained(output_dir)

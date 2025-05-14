@@ -15,6 +15,7 @@ cd friday-vlm
 # pip install -e . --extra-index-url https://download.pytorch.org/whl/cu121 -c constraints.txt
 pip install -e . --no-build-isolation
 pip install --force-reinstall torchvision
+pip install wandb
 git clone https://huggingface.co/datasets/BoyaWu10/Bunny-v1_0-data
 rm -rf Bunny-v1_0-data/.git
 cat Bunny-v1_0-data/pretrain/images.tar.gz.part-* > Bunny-v1_0-data/pretrain/images.tar.gz
