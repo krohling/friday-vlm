@@ -6,8 +6,8 @@ from PIL import Image
 def test_images_paths():
     current_file_path = Path(__file__).resolve()
     return [
-        current_file_path.parent / "assets" / "cat_1.jpeg", 
-        current_file_path.parent / "assets" / "cat_2.jpeg"
+        current_file_path.parent / "assets" / "images" / "cat_1.jpeg", 
+        current_file_path.parent / "assets" / "images" / "cat_2.jpeg"
     ]
 
 @pytest.fixture()
