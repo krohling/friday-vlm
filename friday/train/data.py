@@ -78,6 +78,23 @@ class PretrainingDataset(Dataset):
         self.samples = json.load(open(data_path, "r"))
         if max_count is not None:
             self.samples = self.samples[:max_count]
+    
+    # @property
+    # def lengths(self):
+    #     length_list = []
+    #     for sample in self.list_data_dict:
+    #         img_tokens = 128 if 'image' in sample else 0
+    #         length_list.append(sum(len(conv['value'].split()) for conv in sample['conversations']) + img_tokens)
+    #     return length_list
+
+    # @property
+    # def modality_lengths(self):
+    #     length_list = []
+    #     for sample in self.list_data_dict:
+    #         cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
+    #         cur_len = cur_len if 'image' in sample else -cur_len
+    #         length_list.append(cur_len)
+    #     return length_list
 
     def __len__(self):
         return len(self.samples)

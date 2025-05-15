@@ -13,9 +13,7 @@ import transformers
 
 from friday.train.friday_trainer import FridayTrainer
 
-from friday import conversation as conversation_lib
 from friday.model import *
-from friday.util.data_utils import make_supervised_data_module
 from friday.train.config import FridayTrainingArguments, DataArguments
 
 local_rank = None
@@ -153,14 +151,18 @@ def train():
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
     
+
+    assert "model" in config, "Model config is required."
+    assert "language_model" in config.model, "Language model config is required."
+    assert "data" in config, "Data config is required."
+    assert "training" in config, "Training config is required."
+
     training_args = FridayTrainingArguments(**config.training)
     training_args.deepspeed = args.deepspeed if args.deepspeed else None
     
 
     
     
-    
-
     # ------ 1. Configure quantization and dtype ------
     bnb_model_from_pretrained_args = {}
     if training_args.bits in [4, 8]:
@@ -178,32 +180,36 @@ def train():
     
 
 
+
     # ------ 2. Load model, tokenizer, and vision tower ------
     if args.resume_from_checkpoint:
         adapter_checkpoint = os.path.join(args.resume_from_checkpoint, 'mm_projector.bin')
         if os.path.exists(adapter_checkpoint):
-            config.model.vision_adapter["checkpoint_path"] = adapter_checkpoint
+            if "vision_adapter" in config.model:
+                config.model.vision_adapter.checkpoint_path = adapter_checkpoint
+            else:
+                config.model.vision_adapter = EasyDict()
+                config.model.vision_adapter.checkpoint_path = adapter_checkpoint
+
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(
+        config.model.language_model.tokenizer_name_or_path,
+        **config.model.language_model.tokenizer_params,
+    )
+    if tokenizer.unk_token is not None and tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.unk_token
 
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     model = FridayForCausalLM.from_pretrained(
         config.model.language_model.model_name_or_path,
-        cache_dir=training_args.cache_dir,
         cfg_vision_tower=config.model.vision_tower,
         cfg_vision_adapter=config.model.vision_adapter,
         torch_dtype=compute_dtype,
         **bnb_model_from_pretrained_args,
         **config.model.language_model.model_params,
+        tokenizer_model_max_length=tokenizer.model_max_length,
     )
     model.initialize_vision_modules()
-
-    tokenizer = transformers.AutoTokenizer.from_pretrained(
-        config.model.language_model.tokenizer_name_or_path,
-        cache_dir=training_args.cache_dir,
-        **config.model.language_model.tokenizer_params,
-    )
-
-    if tokenizer.unk_token is not None and tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.unk_token
 
 
     
@@ -276,27 +282,18 @@ def train():
     # model.config.tokenizer_model_max_length = tokenizer.model_max_length
 
     # model.config.tune_mm_mlp_adapter = training_args.tune_mm_mlp_adapter = model_args.tune_mm_mlp_adapter
-    # model.config.freeze_mm_mlp_adapter = training_args.freeze_mm_mlp_adapter
     # model.config.mm_projector_lr = training_args.mm_projector_lr
     # model.config.use_s2 = model_args.use_s2
 
-    # model.config.unfreeze_vision_tower = training_args.unfreeze_vision_tower = model_args.unfreeze_vision_tower
-
 
     
     
 
 
 
-    # ------ 5. Configure conversation and data module ------
+    # ------ 4. Configure Dataset and Trainer ------
 
     from friday.train.data import PretrainingDataset, PretrainingCollator
-
-    # conversation_lib.default_conversation = conversation_lib.conv_templates["default"]
-
-    # data_module = make_supervised_data_module(tokenizer=tokenizer,
-    #                                           vision_tower=model.get_vision_tower(),
-    #                                           data_args=config.data)
 
     train_dataset = PretrainingDataset(
         data_path=config.data.data_path,
@@ -309,7 +306,6 @@ def train():
     data_collator = PretrainingCollator(
         tokenizer=tokenizer,
     )
-    
 
     trainer = FridayTrainer(
         model=model,
@@ -325,19 +321,15 @@ def train():
     
     
     
-    
-    
-    
-    # if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
-    #     trainer.train(resume_from_checkpoint=True)
-    # else:
-    #     trainer.train()
+    # ------ 5. Perform Training ------
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
-    # trainer.train()
     trainer.save_state()
 
-    model.config.use_cache = True
 
+
+
+    # ------ 6. Save model ------
+    # model.config.use_cache = True
     if training_args.lora_enable:
         state_dict = get_peft_state_maybe_zero_3(
             model.named_parameters(), training_args.lora_bias
@@ -350,8 +342,10 @@ def train():
             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
     else:
-        safe_save_model_for_hf_trainer(trainer=trainer,
-                                       output_dir=training_args.output_dir)
+        safe_save_model_for_hf_trainer(
+            trainer=trainer,
+            output_dir=training_args.output_dir
+        )
 
 
 if __name__ == "__main__":
