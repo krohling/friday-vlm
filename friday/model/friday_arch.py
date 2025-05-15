@@ -34,7 +34,6 @@ DEFAULT_CFG_SPECIAL_TOKENS = {
 }
 DEFAULT_CFG_VISION_TOWER = {
     "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
-    # "pretrained_model_name_or_path": "google/siglip2-so400m-patch16-384",
     "s2_scales": "384,768",
     "use_s2": True,
     "pad_to_square": True,
