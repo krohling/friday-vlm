@@ -1,47 +1,45 @@
 {
+    "tokenizer": {
+        "pretrained_model_name_or_path": "kevin510/friday",
+        "model_max_length": 1024,
+        "padding_side": "right",
+        "use_fast": true,
+        "trust_remote_code": true
+    },
     "model": {
-      "language_model": {
-        "model_name_or_path": "microsoft/Phi-4-mini-reasoning",
-        "tokenizer_name_or_path": "kevin510/friday",
-        "freeze": true,
-        "tokenizer_params": {
-            "model_max_length": 1024,
-            "padding_side": "right",
-            "use_fast": true,
-            "trust_remote_code": true
+        "pretrained_model_name_or_path": "microsoft/Phi-4-mini-reasoning",
+        "device_map": "cuda",
+        "cfg_vision_tower": {
+            "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
+            "s2_scales": "384,768",
+            "use_s2": true,
+            "pad_to_square": true,
+            "model_params": { "device_map": "cuda" }
         },
-        "model_params": {
-            "use_cache": false,
-            "device_map": "cuda"
+        "cfg_vision_adapter": {
+            "input_dim": 1536,
+            "hidden_dim": 512,
+            "output_dim": 3072,
+            "num_layers": 2,
+            "activation": "gelu",
+            "device": "cuda",
+            "checkpoint_path": null
         }
-      },
-      "vision_tower": {
-        "model_name_or_path": "google/siglip2-base-patch16-384",
-        "s2_scales": "384,768",
-        "use_s2": true,
-        "pad_to_square": true,
-        "freeze": true,
-        "model_params": {
-            "device_map": "cuda"
-        }
-      },
-      "vision_adapter": {
-        "input_dim": 1536,
-        "hidden_dim": 512,
-        "output_dim": 3072,
-        "num_layers": 2,
-        "activation": "gelu",
-        "checkpoint_path": null,
-        "freeze": false,
-        "device": "cuda"
-      }
+    },
+    "data": {
+        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
+        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
+        "max_count": 1000
     },
     "training": {
         "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
-        "save_only_mm_projector": true,
+        "save_only_vision_adapter": true,
         "bits": 16,
         "lora_enable": false,
+        "freeze_language_model": true,
+        "freeze_vision_tower": true,
+        "freeze_vision_adapter": false,
         "lora_params": {
             "r": 64,
             "alpha": 16,
@@ -107,14 +105,6 @@
                 "reduce_bucket_size": "auto"
             }
         }
-    },
-    "data": {
-        "conversation_template": "plain",
-        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
-        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
-        "is_multimodal": true,
-        "image_aspect_ratio": "square",
-        "max_count": 600000
     }
   }
   

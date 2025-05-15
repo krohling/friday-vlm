@@ -33,8 +33,8 @@ DEFAULT_CFG_SPECIAL_TOKENS = {
     "image_end_token_id": 200031,
 }
 DEFAULT_CFG_VISION_TOWER = {
-    "model_name_or_path": "google/siglip2-base-patch16-384",
-    # "model_name_or_path": "google/siglip2-so400m-patch16-384",
+    "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
+    # "pretrained_model_name_or_path": "google/siglip2-so400m-patch16-384",
     "s2_scales": "384,768",
     "use_s2": True,
     "pad_to_square": True,
@@ -56,6 +56,7 @@ class FridayConfig(Phi3Config):
     def __init__(self, 
             base_model_name_or_path: str | None = "microsoft/Phi-4-mini-instruct",
             delay_load=True, 
+            tokenizer_model_max_length=None,
             **kwargs
         ):
         base_kwargs = {}
@@ -68,6 +69,7 @@ class FridayConfig(Phi3Config):
 
         merged = {**base_kwargs, **kwargs}
         self.delay_load = delay_load
+        self.tokenizer_model_max_length = tokenizer_model_max_length
 
         self._cfg_vision_tower = DEFAULT_CFG_VISION_TOWER.copy()
         if "cfg_vision_tower" in kwargs:
@@ -425,10 +427,9 @@ class FridayForCausalLM(Phi3ForCausalLM):
             padding_value=IGNORE_INDEX
         ).long()
 
-        max_len = getattr(self.config, 'tokenizer_model_max_length', None)
-        if max_len is not None:
-            new_input_embeds = new_input_embeds[:, :max_len]
-            new_labels       = new_labels[:, :max_len]
+        if self.config.tokenizer_model_max_length is not None:
+            new_input_embeds = new_input_embeds[:, :self.config.tokenizer_model_max_length]
+            new_labels       = new_labels[:, :self.config.tokenizer_model_max_length]
 
         
         

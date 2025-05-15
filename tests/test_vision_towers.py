@@ -20,9 +20,9 @@ from PIL import Image
 def build_tower(use_s2=False):
     from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
     if use_s2:
-        return SiglipVisionTowerS2(model_name_or_path="google/siglip2-base-patch16-384", s2_scales="384,768")
+        return SiglipVisionTowerS2(pretrained_model_name_or_path="google/siglip2-base-patch16-384", s2_scales="384,768")
     else:
-        return SiglipVisionTower(model_name_or_path="google/siglip2-base-patch16-384")
+        return SiglipVisionTower(pretrained_model_name_or_path="google/siglip2-base-patch16-384")
 
 @pytest.fixture
 def tower():

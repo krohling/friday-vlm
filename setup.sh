@@ -28,5 +28,4 @@ pytest -s
 # wandb login <your_api_key>
 # export WANDB_ENTITY=
 # export WANDB_PROJECT=
-# export WANDB_LOG_MODEL=checkpoint
 # deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json

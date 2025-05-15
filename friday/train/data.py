@@ -1,4 +1,5 @@
 import os
+import random
 from dataclasses import dataclass
 import json
 from typing import Dict, Sequence
@@ -77,24 +78,20 @@ class PretrainingDataset(Dataset):
         self.vision_tower = vision_tower
         self.samples = json.load(open(data_path, "r"))
         if max_count is not None:
-            self.samples = self.samples[:max_count]
-    
-    # @property
-    # def lengths(self):
-    #     length_list = []
-    #     for sample in self.list_data_dict:
-    #         img_tokens = 128 if 'image' in sample else 0
-    #         length_list.append(sum(len(conv['value'].split()) for conv in sample['conversations']) + img_tokens)
-    #     return length_list
+            self.samples = random.sample(self.samples, max_count)
+        
+        self.sample_lengths = []
+        for sample in self.samples:
+            img_tokens = self.vision_tower.num_patches if 'image' in sample else 0
+            est_text_tokens = len(sample['conversations'][-1]['value'].split())
+            total_tokens = img_tokens + est_text_tokens
 
-    # @property
-    # def modality_lengths(self):
-    #     length_list = []
-    #     for sample in self.list_data_dict:
-    #         cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
-    #         cur_len = cur_len if 'image' in sample else -cur_len
-    #         length_list.append(cur_len)
-    #     return length_list
+            if total_tokens> self.tokenizer.model_max_length:
+                total_tokens = self.tokenizer.model_max_length
+            if img_tokens > 0:
+                total_tokens *= -1 # negative length indicates a multimodal sample
+            
+            self.sample_lengths.append(total_tokens)
 
     def __len__(self):
         return len(self.samples)

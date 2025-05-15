@@ -10,11 +10,11 @@ from friday.util.s2wrapper import forward as multiscale_forward
 
 
 class SiglipVisionTower(nn.Module):
-    def __init__(self, model_name_or_path, model_params={}, pad_to_square=True, **kwargs):
+    def __init__(self, pretrained_model_name_or_path, model_params={}, pad_to_square=True, **kwargs):
         super().__init__()
 
         self.is_loaded = False
-        self.model_name_or_path = model_name_or_path
+        self.pretrained_model_name_or_path = pretrained_model_name_or_path
         self.model_params = model_params
         self.pad_to_square = pad_to_square
         self.select_layer = -2
@@ -27,10 +27,10 @@ class SiglipVisionTower(nn.Module):
     def load_model(self):
         if self.is_loaded:
             return
-        self.image_processor = SiglipImageProcessor.from_pretrained(self.model_name_or_path)
+        self.image_processor = SiglipImageProcessor.from_pretrained(self.pretrained_model_name_or_path)
         self.image_processor.crop_size = self.image_processor.size
         self.vision_tower = SiglipVisionModel.from_pretrained(
-            self.model_name_or_path,
+            self.pretrained_model_name_or_path,
             **self.model_params,
         )
         self.vision_tower.requires_grad_(False)
@@ -98,13 +98,13 @@ class SiglipVisionTower(nn.Module):
 
 
 class SiglipVisionTowerS2(SiglipVisionTower):
-    def __init__(self, model_name_or_path, s2_scales, model_params={}, **kwargs):
+    def __init__(self, pretrained_model_name_or_path, s2_scales, model_params={}, **kwargs):
         self.s2_scales = list(map(int, s2_scales.split(',')))
         self.s2_scales.sort()
         self.s2_split_size = self.s2_scales[0]
         self.s2_image_size = self.s2_scales[-1]
 
-        super().__init__(model_name_or_path, model_params)
+        super().__init__(pretrained_model_name_or_path, model_params)
 
         self.multiscale_forward = multiscale_forward
 

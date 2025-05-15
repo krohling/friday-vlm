@@ -65,7 +65,7 @@ def patch_modules(monkeypatch):
     """
     # Patch constants used by pipeline
     import friday.constants as const
-    monkeypatch.setattr(const, "IMAGE_TOKEN", "<image>", raising=True)
+    # monkeypatch.setattr(const, "IMAGE_TOKEN", "<image>", raising=True)
     monkeypatch.setattr(const, "PAD_FOR_EOS", -123,      raising=True)
     monkeypatch.setattr(const, "IGNORE_INDEX", -100,     raising=True)
 
@@ -118,6 +118,11 @@ def test_label_masking(test_images_paths):
 
     img_tok_id = tokenizer.vocab["<image>"]
     mask_positions = out["input_ids"] == img_tok_id
+
+    print("*****************")
+    print(out)
+    print(out["labels"])
+    print(mask_positions)
 
     assert torch.all(out["labels"][mask_positions] == -100)   # IGNORE_INDEX
 
