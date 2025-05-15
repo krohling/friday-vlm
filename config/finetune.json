@@ -1,7 +1,7 @@
 {
     "tokenizer": {
         "pretrained_model_name_or_path": "kevin510/friday",
-        "model_max_length": 1024,
+        "model_max_length": 2048,
         "padding_side": "right",
         "use_fast": true,
         "trust_remote_code": true
@@ -29,33 +29,16 @@
     "data": {
         "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
         "image_dir": "./Bunny-v1_0-data/pretrain/images/",
-        "max_count": 1000
+        "max_count": 250
     },
     "training": {
+        "bits": 16,
         "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
         "save_only_vision_adapter": true,
-        "bits": 16,
-        "lora_enable": false,
         "freeze_language_model": true,
         "freeze_vision_tower": true,
         "freeze_vision_adapter": false,
-        "lora_params": {
-            "r": 64,
-            "alpha": 16,
-            "dropout": 0.05,
-            "bias": "none",
-            "weight_path": ""
-        },
-        "bits_and_bytes_params": {
-            "llm_int8_skip_modules": ["mm_projector"],
-            "llm_int8_threshold": 6.0,
-            "llm_int8_has_fp16_weight": false,
-            "bnb_4bit_use_double_quant": true,
-            "bnb_4bit_quant_type": "nf4"
-        },
-        
-        
 
         
         "local_rank": -1,
@@ -67,11 +50,10 @@
         "eval_strategy": "no",
         "output_dir": "./checkpoints-pretrain/friday",
         "num_train_epochs": 1,
-        "per_device_train_batch_size": 2,
-        "per_device_eval_batch_size": 1,
+        "per_device_train_batch_size": 8,
         "gradient_accumulation_steps": 4,
         "save_strategy": "steps",
-        "save_steps": 5,
+        "save_steps": 24000,
         "save_total_limit": 1,
         "learning_rate": 5e-4,
         "weight_decay": 0.0,

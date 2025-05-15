@@ -25,7 +25,7 @@ class FridayTrainingArguments(transformers.TrainingArguments):
         default=16,
         metadata={"help": "How many bits to use."}
     )
-    lora_enable: bool = False
+    lora_enable: bool = field(default=False)
     lora_params: dict = field(default_factory=dict)
     bits_and_bytes_params: dict = field(default_factory=dict)
     freeze_language_model: bool = field(default=False)
