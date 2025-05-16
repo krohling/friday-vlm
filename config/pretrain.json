@@ -9,6 +9,7 @@
     "model": {
         "pretrained_model_name_or_path": "microsoft/Phi-4-mini-reasoning",
         "device_map": "cuda",
+        "attn_implementation": "flash_attention_2",
         "cfg_vision_tower": {
             "pretrained_model_name_or_path": "google/siglip2-so400m-patch16-384",
             "s2_scales": "384,768",
@@ -27,9 +28,8 @@
         }
     },
     "data": {
-        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
-        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
-        "max_count": 250
+        "data_path": "datasets/LLaVA-Pretrain/blip_laion_cc_sbu_558k_meta.json",
+        "image_dir": "datasets/LLaVA-Pretrain/images"
     },
     "training": {
         "bits": 16,
@@ -50,12 +50,12 @@
         "eval_strategy": "no",
         "output_dir": "./checkpoints-pretrain/friday",
         "num_train_epochs": 1,
-        "per_device_train_batch_size": 8,
-        "gradient_accumulation_steps": 4,
+        "per_device_train_batch_size": 16,
+        "gradient_accumulation_steps": 1,
         "save_strategy": "steps",
         "save_steps": 24000,
         "save_total_limit": 1,
-        "learning_rate": 5e-4,
+        "learning_rate": 1e-3,
         "weight_decay": 0.0,
         "warmup_ratio": 0.03,
         "lr_scheduler_type": "cosine",

@@ -1,4 +1,5 @@
 .DS_Store
+datasets/
 exclude/
 wandb/
 LLaVA-CC3M-Pretrain-595K/

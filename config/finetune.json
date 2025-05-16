@@ -27,8 +27,8 @@
         }
     },
     "data": {
-        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
-        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
+        "data_path": "datasets/llava_v1_5_mix665k/llava_v1_5_mix665k.json",
+        "image_dir": "datasets/llava_v1_5_mix665k",
         "max_count": 250
     },
     "training": {

@@ -27,13 +27,11 @@
         }
     },
     "data": {
-        "data_path": "./Bunny-v1_0-data/pretrain/bunny_pretrain_laion_2m.json",
-        "image_dir": "./Bunny-v1_0-data/pretrain/images/",
-        "max_count": 250
+        "data_path": "datasets/LLaVA-Pretrain_small/blip_laion_cc_sbu_558k_meta_small.json",
+        "image_dir": "datasets/LLaVA-Pretrain_small/images"
     },
     "training": {
         "bits": 16,
-        "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
         "save_only_vision_adapter": true,
         "freeze_language_model": true,

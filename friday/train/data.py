@@ -21,10 +21,8 @@ def preprocess_for_pretraining(
         vision_tower: torch.nn.Module, 
         tokenizer: transformers.PreTrainedTokenizer
     ) -> dict:
-    conversations = sample["conversations"]
-
-    assert 'image' in sample and sample['image'] is not None, "image must be provided for pretraining"
-    assert conversations[-1]["from"] == "gpt", "last turn must be assistant output"
+    assert 'image' in sample and sample['image'] is not None, "sample provided without image"
+    assert 'caption' in sample and sample['caption'] is not None, "sample provided without caption"
 
     img_files = sample.get("images") or [sample["image"]]
     assert len(img_files) > 0, "no image(s) provided for pre‑training"
@@ -40,7 +38,7 @@ def preprocess_for_pretraining(
         preprocessed_images.append(image)
 
     # 2) build the teacher‑forcing prompt: <image>  answer
-    prompt = " ".join([IMAGE_TOKEN] * len(img_files)) + conversations[-1]["value"]
+    prompt = " ".join([IMAGE_TOKEN] * len(img_files)) + sample['caption']
     input_ids = tokenizer(
         prompt,
         return_tensors="pt",
@@ -82,8 +80,11 @@ class PretrainingDataset(Dataset):
         
         self.sample_lengths = []
         for sample in self.samples:
+            if 'caption' not in sample and 'blip_caption' in sample:
+                sample['caption'] = sample.pop('blip_caption')
+            
             img_tokens = self.vision_tower.num_patches if 'image' in sample else 0
-            est_text_tokens = len(sample['conversations'][-1]['value'].split())
+            est_text_tokens = len(sample['caption'].split())
             total_tokens = img_tokens + est_text_tokens
 
             if total_tokens> self.tokenizer.model_max_length:

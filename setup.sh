@@ -16,15 +16,22 @@ cd friday-vlm
 pip install -e . --no-build-isolation
 pip install --force-reinstall torchvision
 pip install wandb
-git clone https://huggingface.co/datasets/BoyaWu10/Bunny-v1_0-data
-rm -rf Bunny-v1_0-data/.git
-cat Bunny-v1_0-data/pretrain/images.tar.gz.part-* > Bunny-v1_0-data/pretrain/images.tar.gz
-cd Bunny-v1_0-data/pretrain
-tar -xvzf images.tar.gz
-rm images.tar.gz
-cd ../..
+
+mkdir datasets
+wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
+unzip LLaVA-Pretrain_small.zip -d datasets
+rm LLaVA-Pretrain_small.zip
+
+wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k_small.zip
+unzip llava_v1_5_mix665k_small.zip -d datasets
+rm llava_v1_5_mix665k_small.zip
+
+# wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k.zip
+# unzip llava_v1_5_mix665k.zip -d datasets
+# rm llava_v1_5_mix665k.zip
+
 pytest -s
-# pip install wandb
+
 # wandb login <your_api_key>
 # export WANDB_ENTITY=
 # export WANDB_PROJECT=
