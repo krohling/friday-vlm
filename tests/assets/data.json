@@ -1,20 +1,10 @@
 [
     {
         "image": "cat_1.jpeg",
-        "conversations": [
-            {
-                "from": "gpt",
-                "value": "This is a cat"
-            }
-        ]
+        "caption": "This is a cat"
     },
     {
         "image": "cat_2.jpeg",
-        "conversations": [
-            {
-                "from": "gpt",
-                "value": "The image contains a cat"
-            }
-        ]
+        "caption": "This is another cat"
     }
 ]
