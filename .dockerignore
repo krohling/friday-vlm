@@ -1,0 +1,9 @@
+.DS_Store
+Dockerfile
+setup.sh
+deploy_container.sh
+.pytest_cache/
+datasets/
+exclude/
+wandb/
+checkpoints*/

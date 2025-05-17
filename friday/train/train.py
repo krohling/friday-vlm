@@ -1,11 +1,9 @@
 import argparse
 import os
+import time
 
 import json
 from easydict import EasyDict
-
-import logging
-import pathlib
 
 import torch
 
@@ -16,13 +14,15 @@ from friday.train.data import PretrainingDataset, PretrainingCollator
 from friday.train.friday_trainer import FridayTrainer
 from friday.train.config import FridayTrainingArguments, FridayDataArguments
 from friday.util import (
-    rank0_print, 
     find_all_linear_names, 
     get_peft_state_non_lora_maybe_zero_3, 
     get_peft_state_maybe_zero_3
 )
 
 local_rank = None
+def rank0_print(*args):
+    if local_rank == 0:
+        print(*args)
 
 
 def train():
@@ -50,9 +50,15 @@ def train():
     data_args = FridayDataArguments(**config.data)
     training_args = FridayTrainingArguments(**config.training)
     training_args.deepspeed = args.deepspeed if args.deepspeed else None
-    
 
-    
+    if os.environ.get("BATCH_SIZE") is not None:
+        training_args.per_device_train_batch_size = int(os.environ["BATCH_SIZE"])
+    if os.environ.get("GRADIENT_ACCUMULATION_STEPS") is not None:
+        training_args.gradient_accumulation_steps = int(os.environ["GRADIENT_ACCUMULATION_STEPS"])
+    if os.environ.get("LEARNING_RATE") is not None:
+        training_args.learning_rate = float(os.environ["LEARNING_RATE"])
+
+
     
     # ------ 1. Configure quantization and dtype ------
     bnb_model_from_pretrained_args = {}
@@ -189,7 +195,9 @@ def train():
     
     
     # ------ 5. Perform Training ------
+    start_time = time.time()
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+    rank0_print("Training completed in {:.2f} seconds".format(time.time() - start_time))
     trainer.save_state()
 
 

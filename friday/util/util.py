@@ -17,11 +17,6 @@ def maybe_zero_3(param, ignore_status=False, name=None):
     return param
 
 
-def rank0_print(*args):
-    if local_rank == 0:
-        print(*args)
-
-
 # Borrowed from peft.util.get_peft_model_state_dict
 def get_peft_state_maybe_zero_3(named_params, bias):
     if bias == "none":
