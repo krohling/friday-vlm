@@ -12,6 +12,28 @@ from typing import List, Optional
 from friday.util import maybe_zero_3
 from .sampling import LengthGroupedSampler
 
+def save_vision_adapter(model, output_dir):
+    model.config.save_pretrained(output_dir)
+                
+    mm_projector_state = {}
+    for name, p in model.get_vision_adapter().named_parameters():
+        mm_projector_state[name] = maybe_zero_3(p, ignore_status=True, name=name)
+
+    torch.save(mm_projector_state, os.path.join(output_dir, f'mm_projector.bin'))
+
+
+def zip_and_upload_checkpoint_artifact(checkpoint_dir, description, metadata={}):
+    import wandb
+    zip_path = shutil.make_archive(checkpoint_dir, 'zip', checkpoint_dir)
+    artifact = wandb.Artifact(
+        name="checkpoint",
+        type="model",
+        description=description,
+        metadata=metadata,
+    )
+    artifact.add_file(zip_path)
+    wandb.log_artifact(artifact)
+
 class FridayTrainer(Trainer):
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
@@ -130,36 +152,22 @@ class FridayTrainer(Trainer):
                 full_wts_ckpt = os.path.join(output_dir, f"global_step{self.state.global_step}", "mp_rank_00_model_states.pt")
                 if os.path.exists(full_wts_ckpt):
                     os.remove(full_wts_ckpt)
-
-                # 3. zip the checkpoint folder
-                zip_path = shutil.make_archive(output_dir, 'zip', output_dir)
-
-                # 2. upload the zip file to wandb
-                import wandb
-                artifact = wandb.Artifact(
-                    name="checkpoint",
-                    type="model",
-                    description="MM-projector only, frozen backbone",
+                
+                zip_and_upload_checkpoint_artifact(
+                    output_dir,
+                    description="mm-projector checkpoint",
                     metadata={
                         "global_step": self.state.global_step,
                         "epoch": self.state.epoch,
                         **self.state.log_history[-1],
                     },
                 )
-                artifact.add_file(zip_path)
-                wandb.log_artifact(artifact)
 
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         if self.args.save_only_vision_adapter:
             if self.args.local_rank == 0 or self.args.local_rank == -1:
-                self.model.config.save_pretrained(output_dir)
-                
-                mm_projector_state = {}
-                for name, p in self.model.get_vision_adapter().named_parameters():
-                    mm_projector_state[name] = maybe_zero_3(p, ignore_status=True, name=name)
-
-                torch.save(mm_projector_state, os.path.join(output_dir, f'mm_projector.bin'))
+                save_vision_adapter(self.model, output_dir)
         else:
             super(FridayTrainer, self)._save(output_dir, state_dict)
 

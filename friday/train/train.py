@@ -11,7 +11,7 @@ import transformers
 
 from friday.model import *
 from friday.train.data import PretrainingDataset, PretrainingCollator
-from friday.train.friday_trainer import FridayTrainer
+from friday.train.friday_trainer import FridayTrainer, zip_and_upload_checkpoint_artifact
 from friday.train.config import FridayTrainingArguments, FridayDataArguments
 from friday.util import (
     find_all_linear_names, 
@@ -217,8 +217,13 @@ def train():
             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
     else:
-        # TODO
-        pass
+        final_checkpoint_path = os.path.join(training_args.output_dir, 'final_checkpoint')
+        trainer._save(output_dir=final_checkpoint_path)
+        zip_and_upload_checkpoint_artifact(
+            final_checkpoint_path,
+            description="Final checkpoint",
+            metadata={"config": config}
+        )
 
 
 if __name__ == "__main__":
