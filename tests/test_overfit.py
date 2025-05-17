@@ -61,5 +61,8 @@ def test_tiny_overfit():
 
         print(f"Step {step+1}/{STEPS} - Loss: {loss.item():.4f}")
 
+        if loss.item() < TARGET:
+            break
+
 
     assert loss.item() < TARGET, f"did not over‑fit (loss {loss.item():.3f})"

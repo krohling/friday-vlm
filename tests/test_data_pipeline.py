@@ -31,6 +31,10 @@ class DummyVisionTower:
         if pad_and_stack_tensors:
             return torch.zeros(len(imgs), 3, 32, 32)
         return [torch.zeros(3, 32, 32) for _ in imgs]
+    
+    @property
+    def num_patches(self):
+        return 32
 
 
 class DummyTokenizer:
