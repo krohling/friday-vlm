@@ -87,10 +87,7 @@ def patch_modules(monkeypatch):
 def _make_sample(img_file):
     return {
         "image": str(img_file),
-        "conversations": [
-            {"from": "human", "value": "What is this?"},
-            {"from": "gpt",   "value": " A red square."},
-        ],
+        "caption": "A red square.",
     }
 
 # ---------------------------------------------------------------------------- #
