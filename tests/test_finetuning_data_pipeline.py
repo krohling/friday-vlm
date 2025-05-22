@@ -3,7 +3,7 @@
 # Unit tests for the data‑pipeline utilities:
 #   • preprocess_for_finetuning
 #   • FinetuningDataset
-#   • FinetuningCollator
+#   • FridayCollator
 #
 # Heavy external dependencies (real tokenizer, SigLIP tower, etc.) are replaced
 # with fast stubs so the whole file executes in < 1 s on CPU.
@@ -282,7 +282,7 @@ def test_get_item_keys_types(json_dataset, tokenizer, vision_tower):
 
 
 # ---------------------------------------------------------------------------- #
-# -----------------------------  7.3 FinetuningCollator --------------------- #
+# -----------------------------  7.3 FridayCollator --------------------- #
 # ---------------------------------------------------------------------------- #
 
 def _build_batch(ds, idxs):
@@ -310,10 +310,8 @@ def test_padding_and_attention_mask(json_dataset, tokenizer, vision_tower):
 
 
 def test_eos_pad_roundtrip(json_dataset, tokenizer, vision_tower):
-    from friday.data import FinetuningDataset, FinetuningCollator
-    # make tokenizer where pad==eos
-    # tok = DummyTokenizer(pad_id=2, eos_id=2)
-    collator = FinetuningCollator(tokenizer=tokenizer)
+    from friday.data import FinetuningDataset, FridayCollator
+    collator = FridayCollator(tokenizer=tokenizer)
 
     json_path, img_dir, _ = json_dataset
     ds = FinetuningDataset(
@@ -330,7 +328,7 @@ def test_eos_pad_roundtrip(json_dataset, tokenizer, vision_tower):
 
 
 def test_image_list_batch_size(json_dataset, tokenizer, vision_tower):
-    from friday.data import FinetuningDataset, FinetuningCollator
+    from friday.data import FinetuningDataset, FridayCollator
     json_path, img_dir, _ = json_dataset
     ds = FinetuningDataset(
         data_path=str(json_path),
@@ -339,7 +337,7 @@ def test_image_list_batch_size(json_dataset, tokenizer, vision_tower):
         vision_tower=vision_tower,
     )
     batch = _build_batch(ds, [0, 1, 0])
-    out = FinetuningCollator(tokenizer=tokenizer)(batch)
+    out = FridayCollator(tokenizer=tokenizer)(batch)
 
     assert len(out["images"]) == 3
     assert len(out["images"][0]) == 1

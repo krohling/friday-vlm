@@ -59,3 +59,48 @@ def preprocess_for_pretraining(
     }
 
 
+class PretrainingDataset(Dataset):
+    """Dataset for aligning vision adapter."""
+
+    def __init__(self, 
+            data_path: str,
+            image_dir: str,
+            tokenizer: transformers.PreTrainedTokenizer,
+            vision_tower,
+            max_count: int = None
+        ):
+        super(PretrainingDataset, self).__init__()
+        
+        self.image_dir = image_dir
+        self.tokenizer = tokenizer
+        self.vision_tower = vision_tower
+        self.samples = json.load(open(data_path, "r"))
+        if max_count is not None:
+            self.samples = random.sample(self.samples, max_count)
+        
+        self.sample_lengths = []
+        for sample in self.samples:
+            if 'caption' not in sample and 'blip_caption' in sample:
+                sample['caption'] = sample.pop('blip_caption')
+            
+            img_tokens = self.vision_tower.num_patches if 'image' in sample else 0
+            est_text_tokens = len(sample['caption'].split())
+            total_tokens = img_tokens + est_text_tokens
+
+            if total_tokens> self.tokenizer.model_max_length:
+                total_tokens = self.tokenizer.model_max_length
+            if img_tokens > 0:
+                total_tokens *= -1 # negative length indicates a multimodal sample
+            
+            self.sample_lengths.append(total_tokens)
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return preprocess_for_pretraining(
+            self.samples[i],
+            self.image_dir,
+            self.vision_tower,
+            self.tokenizer
+        )
