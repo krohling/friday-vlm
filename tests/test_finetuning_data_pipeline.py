@@ -11,58 +11,15 @@
 # Run with:  pytest -q test_data_pipeline.py
 #
 import json
-import os
-from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 import torch
-from PIL import Image
 
 from util import test_images_paths, build_test_images_paths
 
-from transformers import AutoTokenizer, pipeline
-from PIL import Image
-from friday.model import FridayForCausalLM
+from transformers import AutoTokenizer
 from friday.constants import IGNORE_INDEX
-
-
-# ---------------------------------------------------------------------------- #
-# ---------------------------  Lightweight stubs ----------------------------- #
-# ---------------------------------------------------------------------------- #
-# class DummyVisionTower:
-#     """Provides the single method used in preprocess_for_finetuning."""
-#     def preprocess_images(self, imgs, pad_and_stack_tensors=False):
-#         # returns a (3,32,32) zero tensor for each image
-#         if pad_and_stack_tensors:
-#             return torch.zeros(len(imgs), 3, 32, 32)
-#         return [torch.zeros(3, 32, 32) for _ in imgs]
-    
-#     @property
-#     def num_patches(self):
-#         return 32
-
-
-# class DummyTokenizer:
-#     """Minimal tokenizer fulfilling Finetuning* needs."""
-#     def __init__(self, pad_id=0, eos_id=2, img_id=1):
-#         self.pad_token_id = pad_id
-#         self.eos_token_id = eos_id
-#         self.model_max_length = 128
-
-#         self.vocab = {"<image>": img_id}
-#         self._next = 100  # next fresh id
-
-#     # ─── tokenization ────────────────────────────────────────────────────────
-#     def __call__(self, text, return_tensors="pt", **_kw):
-#         ids = [self._tok2id(tok) for tok in text.split()]
-#         return SimpleNamespace(input_ids=torch.tensor([ids]))
-
-#     def _tok2id(self, tok):
-#         if tok not in self.vocab:
-#             self.vocab[tok] = self._next
-#             self._next += 1
-#         return self.vocab[tok]
 
 
 def build_tower(use_s2=True):
