@@ -169,6 +169,7 @@ def train():
     # ------ 4. Configure Dataset and Trainer ------
 
     if data_args.dataset_type == "finetuning":
+        print("Using finetuning dataset")
         train_dataset = FinetuningDataset(
             data_path=data_args.data_path,
             image_dir=data_args.image_dir,
@@ -177,6 +178,7 @@ def train():
             max_count=data_args.max_count,
         )
     else:
+        print("Using pretraining dataset")
         train_dataset = PretrainingDataset(
             data_path=data_args.data_path,
             image_dir=data_args.image_dir,

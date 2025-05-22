@@ -27,9 +27,9 @@
         }
     },
     "data": {
-        "dataset_type": "pretraining",
-        "data_path": "datasets/LLaVA-Pretrain_small/blip_laion_cc_sbu_558k_meta_small.json",
-        "image_dir": "datasets/LLaVA-Pretrain_small/images",
+        "dataset_type": "finetuning",
+        "data_path": "datasets/llava_v1_5_mix665k_small/llava_v1_5_mix665k_small.json",
+        "image_dir": "datasets/llava_v1_5_mix665k_small",
         "max_count": 25
     },
     "training": {
