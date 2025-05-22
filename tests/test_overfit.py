@@ -2,7 +2,8 @@ import transformers
 import torch, pytest, random
 from torch.nn.functional import cross_entropy
 from PIL import Image
-from friday.train.data.pretraining import PretrainingDataset, PretrainingCollator
+from friday.train.data import PretrainingDataset, FridayCollator
+
 
 STEPS   = 60
 TARGET  = 0.05
@@ -35,7 +36,7 @@ def test_tiny_overfit():
         vision_tower=model.get_vision_tower(),
     )
 
-    collator = PretrainingCollator(
+    collator = FridayCollator(
         tokenizer=tokenizer
     )
 

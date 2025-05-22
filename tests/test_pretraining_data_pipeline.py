@@ -3,7 +3,7 @@
 # Unit tests for the data‑pipeline utilities:
 #   • preprocess_for_pretraining
 #   • PretrainingDataset
-#   • PretrainingCollator
+#   • FridayCollator
 #
 # Heavy external dependencies (real tokenizer, SigLIP tower, etc.) are replaced
 # with fast stubs so the whole file executes in < 1 s on CPU.
@@ -94,7 +94,7 @@ def _make_sample(img_file):
 # ---------------------------  7.1 preprocess_for_pretraining ---------------- #
 # ---------------------------------------------------------------------------- #
 def test_prompt_construction(test_images_paths):
-    from friday.train.data.pretraining import preprocess_for_pretraining
+    from friday.train.data import preprocess_for_pretraining
 
     sample = _make_sample(test_images_paths[0])
 
@@ -109,7 +109,7 @@ def test_prompt_construction(test_images_paths):
 
 
 def test_label_masking(test_images_paths):
-    from friday.train.data.pretraining import preprocess_for_pretraining
+    from friday.train.data import preprocess_for_pretraining
 
     sample = _make_sample(test_images_paths[0])
 
@@ -129,7 +129,7 @@ def test_label_masking(test_images_paths):
 
 
 def test_missing_image_assert(tmp_path):
-    from friday.train.data.pretraining import preprocess_for_pretraining
+    from friday.train.data import preprocess_for_pretraining
 
     sample = {
         "image": None,
@@ -156,7 +156,7 @@ def json_dataset(tmp_path: Path, test_images_paths):
 
 
 def test_len_matches_json(json_dataset):
-    from friday.train.data.pretraining import PretrainingDataset
+    from friday.train.data import PretrainingDataset
 
     json_path, img_dir, N = json_dataset
     ds = PretrainingDataset(
@@ -169,7 +169,7 @@ def test_len_matches_json(json_dataset):
 
 
 def test_get_item_keys_types(json_dataset):
-    from friday.train.data.pretraining import PretrainingDataset
+    from friday.train.data import PretrainingDataset
 
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(
@@ -186,16 +186,15 @@ def test_get_item_keys_types(json_dataset):
 
 
 # ---------------------------------------------------------------------------- #
-# -----------------------------  7.3 PretrainingCollator --------------------- #
+# -----------------------------  7.3 FridayCollator --------------------- #
 # ---------------------------------------------------------------------------- #
-# from friday.train.data import PretrainingCollator        # ensure import after patch
 
 def _build_batch(ds, idxs):
     return [ds[i] for i in idxs]
 
 
 def test_padding_and_attention_mask(json_dataset):
-    from friday.train.data.pretraining import PretrainingDataset, PretrainingCollator
+    from friday.train.data import PretrainingDataset, FridayCollator
     json_path, img_dir, _ = json_dataset
     tok = DummyTokenizer()
     ds = PretrainingDataset(
@@ -206,7 +205,7 @@ def test_padding_and_attention_mask(json_dataset):
     )
     batch = _build_batch(ds, [0, 1])
 
-    collator = PretrainingCollator(tokenizer=tok)
+    collator = FridayCollator(tokenizer=tok)
     out = collator(batch)
 
     assert out["input_ids"].shape == out["labels"].shape
@@ -216,10 +215,10 @@ def test_padding_and_attention_mask(json_dataset):
 
 
 def test_eos_pad_roundtrip(json_dataset):
-    from friday.train.data.pretraining import PretrainingDataset, PretrainingCollator
+    from friday.train.data import PretrainingDataset, FridayCollator
     # make tokenizer where pad==eos
     tok = DummyTokenizer(pad_id=2, eos_id=2)
-    collator = PretrainingCollator(tokenizer=tok)
+    collator = FridayCollator(tokenizer=tok)
 
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(
@@ -236,7 +235,7 @@ def test_eos_pad_roundtrip(json_dataset):
 
 
 def test_image_list_batch_size(json_dataset):
-    from friday.train.data.pretraining import PretrainingDataset, PretrainingCollator
+    from friday.train.data import PretrainingDataset, FridayCollator
     tok = DummyTokenizer()
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(
@@ -246,7 +245,7 @@ def test_image_list_batch_size(json_dataset):
         vision_tower=DummyVisionTower(),
     )
     batch = _build_batch(ds, [0, 1, 0])
-    out = PretrainingCollator(tokenizer=tok)(batch)
+    out = FridayCollator(tokenizer=tok)(batch)
 
     assert len(out["images"]) == 3
     # inner list lengths preserved (=1 image each sample)

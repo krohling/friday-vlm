@@ -144,7 +144,7 @@ def _make_sample(img_file=None):
     _make_sample(),
 ])
 def test_prompt_construction(tokenizer, vision_tower, test_images_paths, sample):
-    from friday.train.data.finetuning import preprocess_for_finetuning
+    from friday.train.data import preprocess_for_finetuning
     out = preprocess_for_finetuning(sample, str(test_images_paths[0].parent), vision_tower, tokenizer, EX_SYSTEM_MESSAGE)
 
     system_tok_id = tokenizer.vocab["<|system|>"]
@@ -177,7 +177,7 @@ def test_prompt_construction(tokenizer, vision_tower, test_images_paths, sample)
     _make_sample(),
 ])
 def test_label_masking(test_images_paths, tokenizer, vision_tower, sample):
-    from friday.train.data.finetuning import preprocess_for_finetuning
+    from friday.train.data import preprocess_for_finetuning
     out = preprocess_for_finetuning(sample, str(test_images_paths[0].parent), vision_tower, tokenizer, EX_SYSTEM_MESSAGE)
 
     inside = False
@@ -214,7 +214,7 @@ def test_label_masking(test_images_paths, tokenizer, vision_tower, sample):
     _make_sample(),
 ])
 def test_image_preprocessing(tokenizer, vision_tower, test_images_paths, sample):
-    from friday.train.data.finetuning import preprocess_for_finetuning
+    from friday.train.data import preprocess_for_finetuning
     out = preprocess_for_finetuning(sample, str(test_images_paths[0].parent), vision_tower, tokenizer, EX_SYSTEM_MESSAGE)
 
     # check that the image is a list of tensors
@@ -230,7 +230,7 @@ def test_image_preprocessing(tokenizer, vision_tower, test_images_paths, sample)
 
 
 def test_missing_image(tokenizer, vision_tower, test_images_paths):
-    from friday.train.data.finetuning import preprocess_for_finetuning
+    from friday.train.data import preprocess_for_finetuning
     sample = _make_sample(test_images_paths[0])
     sample["conversations"][2]["value"] = sample["conversations"][2]["value"] + "<image>"
 
@@ -252,7 +252,7 @@ def json_dataset(tmp_path: Path, test_images_paths):
 
 
 def test_len_matches_json(json_dataset, tokenizer, vision_tower):
-    from friday.train.data.finetuning import FinetuningDataset
+    from friday.train.data import FinetuningDataset
 
     json_path, img_dir, N = json_dataset
     ds = FinetuningDataset(
@@ -265,7 +265,7 @@ def test_len_matches_json(json_dataset, tokenizer, vision_tower):
 
 
 def test_get_item_keys_types(json_dataset, tokenizer, vision_tower):
-    from friday.train.data.finetuning import FinetuningDataset
+    from friday.train.data import FinetuningDataset
 
     json_path, img_dir, _ = json_dataset
     ds = FinetuningDataset(
@@ -290,7 +290,7 @@ def _build_batch(ds, idxs):
 
 
 def test_padding_and_attention_mask(json_dataset, tokenizer, vision_tower):
-    from friday.train.data.finetuning import FinetuningDataset, FinetuningCollator
+    from friday.train.data import FinetuningDataset, FinetuningCollator
     json_path, img_dir, _ = json_dataset
     ds = FinetuningDataset(
         data_path=str(json_path),
@@ -310,7 +310,7 @@ def test_padding_and_attention_mask(json_dataset, tokenizer, vision_tower):
 
 
 def test_eos_pad_roundtrip(json_dataset, tokenizer, vision_tower):
-    from friday.train.data.finetuning import FinetuningDataset, FinetuningCollator
+    from friday.train.data import FinetuningDataset, FinetuningCollator
     # make tokenizer where pad==eos
     # tok = DummyTokenizer(pad_id=2, eos_id=2)
     collator = FinetuningCollator(tokenizer=tokenizer)
@@ -330,7 +330,7 @@ def test_eos_pad_roundtrip(json_dataset, tokenizer, vision_tower):
 
 
 def test_image_list_batch_size(json_dataset, tokenizer, vision_tower):
-    from friday.train.data.finetuning import FinetuningDataset, FinetuningCollator
+    from friday.train.data import FinetuningDataset, FinetuningCollator
     json_path, img_dir, _ = json_dataset
     ds = FinetuningDataset(
         data_path=str(json_path),
