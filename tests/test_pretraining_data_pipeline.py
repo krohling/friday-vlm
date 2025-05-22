@@ -94,7 +94,7 @@ def _make_sample(img_file):
 # ---------------------------  7.1 preprocess_for_pretraining ---------------- #
 # ---------------------------------------------------------------------------- #
 def test_prompt_construction(test_images_paths):
-    from friday.train.data import preprocess_for_pretraining
+    from friday.data import preprocess_for_pretraining
 
     sample = _make_sample(test_images_paths[0])
 
@@ -109,7 +109,7 @@ def test_prompt_construction(test_images_paths):
 
 
 def test_label_masking(test_images_paths):
-    from friday.train.data import preprocess_for_pretraining
+    from friday.data import preprocess_for_pretraining
 
     sample = _make_sample(test_images_paths[0])
 
@@ -129,7 +129,7 @@ def test_label_masking(test_images_paths):
 
 
 def test_missing_image_assert(tmp_path):
-    from friday.train.data import preprocess_for_pretraining
+    from friday.data import preprocess_for_pretraining
 
     sample = {
         "image": None,
@@ -156,7 +156,7 @@ def json_dataset(tmp_path: Path, test_images_paths):
 
 
 def test_len_matches_json(json_dataset):
-    from friday.train.data import PretrainingDataset
+    from friday.data import PretrainingDataset
 
     json_path, img_dir, N = json_dataset
     ds = PretrainingDataset(
@@ -169,7 +169,7 @@ def test_len_matches_json(json_dataset):
 
 
 def test_get_item_keys_types(json_dataset):
-    from friday.train.data import PretrainingDataset
+    from friday.data import PretrainingDataset
 
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(
@@ -194,7 +194,7 @@ def _build_batch(ds, idxs):
 
 
 def test_padding_and_attention_mask(json_dataset):
-    from friday.train.data import PretrainingDataset, FridayCollator
+    from friday.data import PretrainingDataset, FridayCollator
     json_path, img_dir, _ = json_dataset
     tok = DummyTokenizer()
     ds = PretrainingDataset(
@@ -215,7 +215,7 @@ def test_padding_and_attention_mask(json_dataset):
 
 
 def test_eos_pad_roundtrip(json_dataset):
-    from friday.train.data import PretrainingDataset, FridayCollator
+    from friday.data import PretrainingDataset, FridayCollator
     # make tokenizer where pad==eos
     tok = DummyTokenizer(pad_id=2, eos_id=2)
     collator = FridayCollator(tokenizer=tok)
@@ -235,7 +235,7 @@ def test_eos_pad_roundtrip(json_dataset):
 
 
 def test_image_list_batch_size(json_dataset):
-    from friday.train.data import PretrainingDataset, FridayCollator
+    from friday.data import PretrainingDataset, FridayCollator
     tok = DummyTokenizer()
     json_path, img_dir, _ = json_dataset
     ds = PretrainingDataset(

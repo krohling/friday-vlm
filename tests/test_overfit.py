@@ -2,7 +2,7 @@ import transformers
 import torch, pytest, random
 from torch.nn.functional import cross_entropy
 from PIL import Image
-from friday.train.data import PretrainingDataset, FridayCollator
+from friday.data import PretrainingDataset, FridayCollator
 
 
 STEPS   = 60
