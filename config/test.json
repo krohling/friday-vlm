@@ -27,11 +27,14 @@
         }
     },
     "data": {
+        "dataset_type": "pretraining",
         "data_path": "datasets/LLaVA-Pretrain_small/blip_laion_cc_sbu_558k_meta_small.json",
-        "image_dir": "datasets/LLaVA-Pretrain_small/images"
+        "image_dir": "datasets/LLaVA-Pretrain_small/images",
+        "max_count": 25
     },
     "training": {
         "bits": 16,
+        "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
         "save_only_vision_adapter": true,
         "freeze_language_model": true,
@@ -49,11 +52,11 @@
         "output_dir": "./checkpoints-pretrain/friday",
         "num_train_epochs": 1,
         "per_device_train_batch_size": 2,
-        "gradient_accumulation_steps": 8,
+        "gradient_accumulation_steps": 1,
         "save_strategy": "steps",
         "save_steps": 24000,
         "save_total_limit": 1,
-        "learning_rate": 5e-4,
+        "learning_rate": 1e-3,
         "weight_decay": 0.0,
         "warmup_ratio": 0.03,
         "lr_scheduler_type": "cosine",
@@ -61,7 +64,7 @@
         "gradient_checkpointing": true,
         "dataloader_num_workers": 4,
         "max_grad_norm": 1.0,
-        "report_to": "wandb",
+        "report_to": "none",
         "deepspeed": {
             "fp16": {
                 "enabled": "auto",

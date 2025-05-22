@@ -10,7 +10,7 @@ import torch
 import transformers
 
 from friday.model import *
-from friday.data import PretrainingDataset, FridayCollator
+from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
 from friday.train.friday_trainer import FridayTrainer, zip_and_upload_checkpoint_artifact
 from friday.train.config import FridayTrainingArguments, FridayDataArguments
 from friday.util import (
@@ -168,13 +168,22 @@ def train():
 
     # ------ 4. Configure Dataset and Trainer ------
 
-    train_dataset = PretrainingDataset(
-        data_path=data_args.data_path,
-        image_dir=data_args.image_dir,
-        tokenizer=tokenizer,
-        vision_tower=model.get_vision_tower(),
-        max_count=data_args.max_count,
-    )
+    if data_args.dataset_type == "finetuning":
+        train_dataset = FinetuningDataset(
+            data_path=data_args.data_path,
+            image_dir=data_args.image_dir,
+            tokenizer=tokenizer,
+            vision_tower=model.get_vision_tower(),
+            max_count=data_args.max_count,
+        )
+    else:
+        train_dataset = PretrainingDataset(
+            data_path=data_args.data_path,
+            image_dir=data_args.image_dir,
+            tokenizer=tokenizer,
+            vision_tower=model.get_vision_tower(),
+            max_count=data_args.max_count,
+        )
 
     data_collator = FridayCollator(
         tokenizer=tokenizer,
@@ -219,11 +228,12 @@ def train():
     else:
         final_checkpoint_path = os.path.join(training_args.output_dir, 'final_checkpoint')
         trainer._save(output_dir=final_checkpoint_path)
-        zip_and_upload_checkpoint_artifact(
-            final_checkpoint_path,
-            description="Final checkpoint",
-            metadata={"config": config}
-        )
+        if "wandb" in getattr(training_args, "report_to", []):
+            zip_and_upload_checkpoint_artifact(
+                final_checkpoint_path,
+                description="Final checkpoint",
+                metadata={"config": config}
+            )
 
 
 if __name__ == "__main__":
