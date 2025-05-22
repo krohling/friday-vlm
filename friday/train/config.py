@@ -4,6 +4,12 @@ from typing import Optional
 
 @dataclass
 class FridayDataArguments:
+    dataset_type: str = field(
+        default="pretraining",
+        metadata={
+            "help": "The type of dataset to use. Can be 'finetuning' or 'pretraining'."
+        },
+    )
     data_path: str = field(default=None, metadata={"help": "Path to the training data."})
     image_dir: Optional[str] = field(default=None)
     max_count: Optional[int] = field(default=None)

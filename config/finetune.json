@@ -27,6 +27,7 @@
         }
     },
     "data": {
+        "dataset_type": "finetuning",
         "data_path": "datasets/llava_v1_5_mix665k/llava_v1_5_mix665k.json",
         "image_dir": "datasets/llava_v1_5_mix665k",
         "max_count": 250

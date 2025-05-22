@@ -28,6 +28,7 @@
         }
     },
     "data": {
+        "dataset_type": "pretraining",
         "data_path": "datasets/LLaVA-Pretrain/blip_laion_cc_sbu_558k_meta.json",
         "image_dir": "datasets/LLaVA-Pretrain/images"
     },

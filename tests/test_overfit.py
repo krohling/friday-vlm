@@ -2,14 +2,21 @@ import transformers
 import torch, pytest, random
 from torch.nn.functional import cross_entropy
 from PIL import Image
-from friday.data import PretrainingDataset, FridayCollator
+from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
 
 
 STEPS   = 60
 TARGET  = 0.05
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs GPU")
-def test_tiny_overfit():
+@pytest.mark.parametrize(
+    "dataset_type",
+    [
+        "pretrain",
+        "finetuning",
+    ],
+)
+def test_tiny_overfit(dataset_type):
     from friday.model import FridayForCausalLM, FridayConfig
     cfg = FridayConfig()
 
@@ -17,25 +24,37 @@ def test_tiny_overfit():
     model.initialize_vision_modules()
     model.cuda()
     model.set_vision_tower_dtype(torch.bfloat16)
-    model.print_device_configuration()
 
     tokenizer = transformers.AutoTokenizer.from_pretrained('kevin510/friday')
 
-    # ───────── freeze LLM & tower; leave adapter trainable ─────────
-    model.set_language_model_requires_grad(False)
-    model.set_vision_tower_requires_grad(False)
-    model.set_vision_adapter_requires_grad(True)
-
-    optim = torch.optim.AdamW(model.model.mm_projector.parameters(), lr=0.0003)
-
     # ───────── build one synthetic batch (you can load a real datum instead) ────────
-    dataset = PretrainingDataset(
-        data_path="./tests/assets/data.json",
-        image_dir="./tests/assets/images/",
-        tokenizer=tokenizer,
-        vision_tower=model.get_vision_tower(),
-    )
-
+    if dataset_type == "finetuning":
+        print("Testing overfit on finetuning dataset")
+        model.set_language_model_requires_grad(True)
+        model.set_vision_tower_requires_grad(False)
+        model.set_vision_adapter_requires_grad(False)
+        dataset = FinetuningDataset(
+            data_path="./datasets/llava_v1_5_mix665k_small/llava_v1_5_mix665k_small.json",
+            image_dir="./datasets/llava_v1_5_mix665k_small/",
+            tokenizer=tokenizer,
+            vision_tower=model.get_vision_tower(),
+            max_count=2
+        )
+    else:
+        print("Testing overfit on pretraining dataset")
+        model.set_language_model_requires_grad(False)
+        model.set_vision_tower_requires_grad(False)
+        model.set_vision_adapter_requires_grad(True)
+        dataset = PretrainingDataset(
+            data_path="./datasets/LLaVA-Pretrain_small/blip_laion_cc_sbu_558k_meta_small.json",
+            image_dir="./datasets/LLaVA-Pretrain_small/images",
+            tokenizer=tokenizer,
+            vision_tower=model.get_vision_tower(),
+            max_count=2
+        )
+    
+    optim = torch.optim.AdamW(model.model.mm_projector.parameters(), lr=0.0003)
+    model.print_device_configuration()
     collator = FridayCollator(
         tokenizer=tokenizer
     )
