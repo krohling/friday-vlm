@@ -12,6 +12,7 @@
 import types
 import pytest
 import torch
+from friday.util import mask_token_segment
 from PIL import Image
 
 
@@ -194,3 +195,30 @@ def test_build_tokenizer_adds_specials(monkeypatch):
     assert set(specials.values()) == {tok.convert_tokens_to_ids(t) for t in expected}
     # pad_token set equal to eos_token
     assert tok.pad_token_id == tok.eos_token_id
+
+
+def test_mask_token_segment():
+    start_id = 2000
+    end_id = 2001
+    not_targeted_start_id = 2002
+    mask_value = -100
+    input_ids = torch.tensor([
+        1, 2, 3, 
+        not_targeted_start_id, 4, 5, 6, end_id,
+        7, 8, 9,
+        start_id, 10, 11, 12, 13, 14, 15, end_id,
+        16, 17, 18, 19, 20,
+        not_targeted_start_id, 21, 22, 23, 24, 25, end_id,
+        26, 27, 28,
+        start_id, 29, 30, 31, 32, end_id,
+        33, 34, 35, 36, 37
+    ])
+
+    masked_input_ids = mask_token_segment(start_id, end_id, input_ids, mask_value)
+
+    assert(torch.equal(masked_input_ids[:11], input_ids[:11]))
+    assert(torch.equal(masked_input_ids[11:19], torch.tensor([mask_value] * 8)))
+    assert(torch.equal(masked_input_ids[19:34], input_ids[19:34]))
+    assert(torch.equal(masked_input_ids[34:40], torch.tensor([mask_value] * 6)))
+    assert(torch.equal(masked_input_ids[40:], input_ids[40:]))
+    

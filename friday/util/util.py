@@ -3,6 +3,87 @@ import torch.nn.functional as F
 
 from PIL import Image
 
+
+# def mask_token_segment(start_token, end_token, input_ids, mask_value=-100):
+#     is_start_token = input_ids == start_token
+#     cum_start = torch.cumsum(is_start_token, dim=0)
+
+#     is_end_token = (input_ids == end_token)
+
+#     cum_end = torch.cumsum(is_end_token, dim=0)
+
+#     print("mask")
+#     print(cum_end.masked_fill(cum_end > cum_start, 0))
+
+#     is_masked = (cum_start > cum_end)
+
+#     print(f"is_start_token: {is_start_token}")
+#     print(f"is_end_token: {is_end_token}")
+#     print(f"cum_start: {cum_start}")
+#     print(f"cum_end: {cum_end}")
+#     print(f"is_masked: {is_masked}")
+
+#     result = input_ids.clone()
+#     result[is_masked] = mask_value
+#     return result
+
+import torch
+
+def mask_token_segment(
+               start_id: int,
+               end_id: int,
+               input_ids: torch.Tensor,
+               fill_value: int = -100):
+    """
+    Replace *every* token from each `start_id` **through** its matching `end_id`
+    (boundaries included) with `fill_value`.  Any spans that start with some
+    other token are left untouched.
+
+    Works on CUDA, TorchScript, batched via vmap, etc.—no Python loops.
+    """
+    if input_ids.dim() != 1:
+        raise ValueError("`input_ids` must be 1-D")
+
+    device = input_ids.device
+    n       = input_ids.size(0)
+
+    # where the *target* start-tokens and end-tokens sit
+    start_pos = (input_ids == start_id).nonzero(as_tuple=True)[0]      # ascending
+    end_pos   = (input_ids == end_id).nonzero(as_tuple=True)[0]        # ascending
+
+    if start_pos.numel() == 0:
+        return input_ids.clone()
+
+    # ── pair every start with the first end that comes *after* it ────────────────
+    # searchsorted gives the insertion index into the (sorted) end positions
+    idx_in_end = torch.searchsorted(end_pos, start_pos, right=False)
+
+    have_match = idx_in_end < end_pos.size(0)                # safety: drop unmatched
+    start_pos  = start_pos[have_match]
+    end_pos    = end_pos[idx_in_end[have_match]]
+
+    # (rare) guard against pathological orderings
+    keep = end_pos > start_pos
+    start_pos, end_pos = start_pos[keep], end_pos[keep]
+
+    if start_pos.numel() == 0:
+        return input_ids
+
+    # ── differential “scan-line” trick to build the span mask in O(N) ───────────
+    # +1 at each start index, -1 at the element *after* each end
+    delta = torch.zeros(n + 1, dtype=torch.int8, device=device)
+    delta[start_pos]        += 1
+    delta[end_pos + 1]      -= 1          # +1 is safe because delta is length n+1
+
+    inside = torch.cumsum(delta[:-1], dim=0) > 0   # boolean mask, incl. boundaries
+
+    # ── apply ────────────────────────────────────────────────────────────────────
+    out = input_ids.clone()
+    out[inside] = fill_value
+    return out
+
+
+
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
     from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
