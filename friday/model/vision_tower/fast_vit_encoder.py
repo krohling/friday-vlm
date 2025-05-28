@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import PIL.Image
 from typing import List
@@ -21,7 +22,7 @@ class FastVitVisionTower(nn.Module):
 
     @property
     def output_dim(self):
-        return self.vision_tower.config.hidden_size if self.vision_tower else None
+        return self.vision_tower.config.embed_dim if self.vision_tower else None
     
     def load_model(self):
         if self.is_loaded:
@@ -40,7 +41,9 @@ class FastVitVisionTower(nn.Module):
         img_mean = tuple(int(x * 255) for x in self.image_processor.image_mean)
         if self.pad_to_square:
             imgs = [expand2square(img, img_mean) for img in imgs]
-        imgs = [self.image_processor(img, return_tensors="pt")['pixel_values'][0] for img in imgs]
+        
+        imgs = [self.image_processor(img, do_resize=True, do_center_crop=False, return_tensors="pt")['pixel_values'][0] for img in imgs]
+        
 
         if pad_and_stack_tensors:
             imgs = pad_and_stack(imgs, pad_value=0.0)
@@ -52,23 +55,20 @@ class FastVitVisionTower(nn.Module):
         if type(images) is list:
             image_features = []
             for image in images:
-                image_feature = self.vision_tower(image.to(
-                    device=self.device, 
-                    dtype=self.dtype).unsqueeze(0),
-                    output_hidden_states=True
+                image_feature = self.vision_tower(
+                    image.to(device=self.device, dtype=self.dtype).unsqueeze(0)
                 )
                 image_features.append(image_feature)
         else:
             image_features = self.vision_tower(
                 images.to(device=self.device, dtype=self.dtype),
-                output_hidden_states=True
             )
 
         return image_features
 
     @property
     def dummy_feature(self):
-        return torch.zeros(1, self.hidden_size, device=self.device, dtype=self.dtype)
+        return torch.zeros(1, self.embed_dim, device=self.device, dtype=self.dtype)
 
     @property
     def dtype(self):
@@ -87,7 +87,7 @@ class FastVitVisionTower(nn.Module):
 
     @property
     def hidden_size(self):
-        return self.config.hidden_size
+        return self.config.embed_dim
 
     @property
     def num_patches(self):
@@ -104,26 +104,34 @@ class FastVitVisionTowerS2(FastVitVisionTower):
         super().__init__(pretrained_model_name_or_path, model_params)
 
         self.multiscale_forward = multiscale_forward
-
-        self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
-        self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
     
     @property
     def output_dim(self):
-        return (2*self.vision_tower.config.hidden_size) if self.vision_tower else None
+        return (2*self.vision_tower.config.embed_dim) if self.vision_tower else None
 
     def load_model(self):
         if self.is_loaded:
             return
         
         super().load_model()
-        self.image_processor.size['height'] = self.image_processor.size['width'] = self.s2_image_size
-        self.image_processor.crop_size['height'] = self.image_processor.crop_size['width'] = self.s2_image_size
+        self.image_processor.size = self.image_processor.crop_size = {
+            "height": self.s2_image_size,
+            "width":  self.s2_image_size
+        }
 
     def forward_feature(self, images):
+        image_size = self.vision_tower.config.image_size
+        if images.shape[2] != image_size or images.shape[3] != image_size:
+            images = F.interpolate(
+                images,
+                size=(image_size, image_size),
+                mode="bilinear",
+                align_corners=False,
+                antialias=True
+            )    
+
         return self.vision_tower(
             images.to(device=self.device, dtype=self.dtype),
-            output_hidden_states=True
         )
 
     def forward(self, images):
@@ -149,4 +157,4 @@ class FastVitVisionTowerS2(FastVitVisionTower):
 
     @property
     def hidden_size(self):
-        return self.config.hidden_size * len(self.s2_scales)
+        return self.config.embed_dim * len(self.s2_scales)

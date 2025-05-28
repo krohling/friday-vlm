@@ -26,10 +26,13 @@ def build_tower(use_s2=False, type="siglip"):
             return SiglipVisionTower(pretrained_model_name_or_path="google/siglip2-base-patch16-384")
     elif type == "fast_vit":
         from friday.model.vision_tower.fast_vit_encoder import FastVitVisionTower, FastVitVisionTowerS2
+        model_params = {
+            "trust_remote_code": True,
+        }
         if use_s2:
-            return FastVitVisionTowerS2(pretrained_model_name_or_path="kevin510/fast-vit-hd", s2_scales="384,768")
+            return FastVitVisionTowerS2(pretrained_model_name_or_path="kevin510/fast-vit-hd", s2_scales="512,1024", model_params=model_params)
         else:
-            return FastVitVisionTower(pretrained_model_name_or_path="kevin510/fast-vit-hd")
+            return FastVitVisionTower(pretrained_model_name_or_path="kevin510/fast-vit-hd", model_params=model_params)
 
 @pytest.fixture
 def tower():
@@ -76,10 +79,15 @@ def test_preprocess(v_tower):
         assert t.ndim == 3
         assert t.shape[0] == 3
         assert t.shape[1] == t.shape[2]
-        assert t.shape[1] == tower.image_processor.size["height"]
-        assert t.shape[2] == tower.image_processor.size["width"]
         assert t.dtype == torch.float32
         assert t.device == tower.device
+
+        if "height" in tower.image_processor.size and "width" in tower.image_processor.size:
+            assert t.shape[1] == tower.image_processor.size["height"]
+            assert t.shape[2] == tower.image_processor.size["width"]
+        elif "shortest_edge" in tower.image_processor.size:
+            assert t.shape[1] == tower.image_processor.size["shortest_edge"]
+            assert t.shape[2] == tower.image_processor.size["shortest_edge"]
     
 @pytest.mark.parametrize(
     "v_tower",
@@ -103,8 +111,14 @@ def test_preprocess_with_pad_and_stack(v_tower):
     assert out.shape[0] == len(img)
     assert out.shape[1] == 3
     assert out.shape[2] == out.shape[3]
-    assert out.shape[2] == tower.image_processor.size["height"]
-    assert out.shape[3] == tower.image_processor.size["width"]
+
+    if "height" in tower.image_processor.size and "width" in tower.image_processor.size:
+        assert out.shape[2] == tower.image_processor.size["height"]
+        assert out.shape[3] == tower.image_processor.size["width"]
+    elif "shortest_edge" in tower.image_processor.size:
+        assert out.shape[2] == tower.image_processor.size["shortest_edge"]
+        assert out.shape[3] == tower.image_processor.size["shortest_edge"]
+
     assert out.dtype == torch.float32
     assert out.device == tower.device
 
@@ -124,7 +138,7 @@ def test_forward_single_tensor(v_tower):
     tensor = tower.preprocess_images([img], pad_and_stack_tensors=True)
     feats = tower(tensor)                                      # (B, P, H)
 
-    expected_patches = (384 // tower.vision_tower.config.patch_size) ** 2
+    expected_patches = (tower.vision_tower.config.image_size // tower.vision_tower.config.patch_size) ** 2
     assert feats.shape == (1, expected_patches, tower.output_dim)
 
 
@@ -144,7 +158,7 @@ def test_forward_list_batching(v_tower):
 
     feats_list = tower(tensors)                                # list len 3
     assert isinstance(feats_list, list) and len(feats_list) == 3
-    p = (384 // tower.vision_tower.config.patch_size) ** 2
+    p = (tower.vision_tower.config.image_size // tower.vision_tower.config.patch_size) ** 2
     for feats in feats_list:
         assert feats.shape == (1, p, tower.output_dim)
 
@@ -165,7 +179,7 @@ def test_forward_tensor_batching(v_tower):
 
     feats_tens = tower(tensors)                                # list len 3
     assert isinstance(feats_tens, torch.Tensor)
-    p = (384 // tower.vision_tower.config.patch_size) ** 2
+    p = (tower.vision_tower.config.image_size // tower.vision_tower.config.patch_size) ** 2
     assert feats_tens.shape == (len(imgs), p, tower.output_dim)
 
 @pytest.mark.parametrize(
