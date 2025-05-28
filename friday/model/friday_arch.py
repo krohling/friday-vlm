@@ -149,11 +149,13 @@ class FridayModel(Phi3Model):
                 self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
             else:
                 self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
-        elif self.cfg_vision_tower.get("type", "siglip").lower() == "fast_vit":
+        elif self.cfg_vision_tower.get("type", "siglip").lower() == "fastvit":
             if self.cfg_vision_tower.get("use_s2", True):
                 self.vision_tower = FastVitVisionTowerS2(**self.cfg_vision_tower)
             else:
                 self.vision_tower = FastVitVisionTower(**self.cfg_vision_tower)
+        else:
+            raise ValueError(f"Unsupported vision tower type: {self.cfg_vision_tower.get('type', 'siglip')}. Supported types are 'siglip' and 'fastvit'.")
         
         self.vision_tower.load_model()
         self.mm_projector = MLPAdapter(**self.cfg_vision_adapter)
