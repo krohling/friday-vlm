@@ -14,7 +14,12 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from friday.util import pad_and_stack
 from friday.model.vision_adapter import MLPAdapter
-from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
+from friday.model.vision_tower import (
+    SiglipVisionTower, 
+    SiglipVisionTowerS2,
+    FastVitVisionTower,
+    FastVitVisionTowerS2
+)
 from friday.model.language_model.phi4 import (
     Phi3Config, 
     Phi3Model, 
@@ -34,6 +39,7 @@ DEFAULT_CFG_SPECIAL_TOKENS = {
 }
 DEFAULT_CFG_VISION_TOWER = {
     "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
+    "type": "siglip",
     "s2_scales": "384,768",
     "use_s2": True,
     "pad_to_square": True,
@@ -138,10 +144,16 @@ class FridayModel(Phi3Model):
         if self.vision_tower is not None:
             return
 
-        if self.cfg_vision_tower.get("use_s2", True):
-            self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
-        else:
-            self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
+        if self.cfg_vision_tower.get("type", "siglip").lower() == "siglip":
+            if self.cfg_vision_tower.get("use_s2", True):
+                self.vision_tower = SiglipVisionTowerS2(**self.cfg_vision_tower)
+            else:
+                self.vision_tower = SiglipVisionTower(**self.cfg_vision_tower)
+        elif self.cfg_vision_tower.get("type", "siglip").lower() == "fast_vit":
+            if self.cfg_vision_tower.get("use_s2", True):
+                self.vision_tower = FastVitVisionTowerS2(**self.cfg_vision_tower)
+            else:
+                self.vision_tower = FastVitVisionTower(**self.cfg_vision_tower)
         
         self.vision_tower.load_model()
         self.mm_projector = MLPAdapter(**self.cfg_vision_adapter)

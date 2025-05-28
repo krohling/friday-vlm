@@ -17,12 +17,19 @@ from PIL import Image
 # --------------------------------------------------------------------------- #
 # -----------------------------  Tower fixtures  ---------------------------- #
 # --------------------------------------------------------------------------- #
-def build_tower(use_s2=False):
-    from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
-    if use_s2:
-        return SiglipVisionTowerS2(pretrained_model_name_or_path="google/siglip2-base-patch16-384", s2_scales="384,768")
-    else:
-        return SiglipVisionTower(pretrained_model_name_or_path="google/siglip2-base-patch16-384")
+def build_tower(use_s2=False, type="siglip"):
+    if type == "siglip":
+        from friday.model.vision_tower import SiglipVisionTower, SiglipVisionTowerS2
+        if use_s2:
+            return SiglipVisionTowerS2(pretrained_model_name_or_path="google/siglip2-base-patch16-384", s2_scales="384,768")
+        else:
+            return SiglipVisionTower(pretrained_model_name_or_path="google/siglip2-base-patch16-384")
+    elif type == "fast_vit":
+        from friday.model.vision_tower.fast_vit_encoder import FastVitVisionTower, FastVitVisionTowerS2
+        if use_s2:
+            return FastVitVisionTowerS2(pretrained_model_name_or_path="kevin510/fast-vit-hd", s2_scales="384,768")
+        else:
+            return FastVitVisionTower(pretrained_model_name_or_path="kevin510/fast-vit-hd")
 
 @pytest.fixture
 def tower():
@@ -47,8 +54,10 @@ def _dummy_pil(width, height, color=(255, 0, 0)):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_preprocess(v_tower):
@@ -75,8 +84,10 @@ def test_preprocess(v_tower):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_preprocess_with_pad_and_stack(v_tower):
@@ -101,8 +112,10 @@ def test_preprocess_with_pad_and_stack(v_tower):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_forward_single_tensor(v_tower):
@@ -118,8 +131,10 @@ def test_forward_single_tensor(v_tower):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_forward_list_batching(v_tower):
@@ -137,8 +152,10 @@ def test_forward_list_batching(v_tower):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_forward_tensor_batching(v_tower):
@@ -154,8 +171,10 @@ def test_forward_tensor_batching(v_tower):
 @pytest.mark.parametrize(
     "v_tower",
     [
-        build_tower(use_s2=False),
-        build_tower(use_s2=True),
+        build_tower(use_s2=False, type="siglip"),
+        build_tower(use_s2=True, type="siglip"),
+        build_tower(use_s2=False, type="fast_vit"),
+        build_tower(use_s2=True, type="fast_vit"),
     ],
 )
 def test_dtype_and_device_passthrough(v_tower):
