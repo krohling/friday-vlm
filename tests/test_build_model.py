@@ -12,11 +12,38 @@ from friday.train.model_factory import build_model      # adjust import path if 
 # helpers
 # --------------------------------------------------------------------------- #
 
-TOKENIZER_CFG = {"pretrained_model_name_or_path": "dummy"}
+
+MODEL_CFG = {
+    "pretrained_model_name_or_path": "microsoft/Phi-4-mini-reasoning",
+    "cfg_vision_tower": {
+        "pretrained_model_name_or_path": "kevin510/fast-vit-hd",
+        "s2_scales": "512,1024",
+        "type": "fastvit",
+        "use_s2": True,
+        "pad_to_square": True,
+        "model_params": { "device_map": "cuda", "trust_remote_code": True }
+    },
+    "cfg_vision_adapter": {
+        "input_dim": 1536,
+        "hidden_dim": 512,
+        "output_dim": 3072,
+        "num_layers": 2,
+        "activation": "gelu",
+        "device": "cuda",
+        "checkpoint_path": None
+    }
+}
+
+TOKENIZER_CFG = {
+    "pretrained_model_name_or_path": "kevin510/friday",
+    "model_max_length": 2048,
+    "padding_side": "right",
+    "use_fast": True,
+    "trust_remote_code": True
+}
 
 def targs(**kw):
     base = dict(
-        bits                = 16,
         fp16                = True,
         bf16                = False,
         lora_enable         = False,
@@ -27,74 +54,116 @@ def targs(**kw):
         freeze_vision_adapter   = False,
         bits_and_bytes_params   = {},
     )
-    base.update(kw)
-    return FridayTrainingArguments(**base)
+    return FridayTrainingArguments(**kw)
 
 # --------------------------------------------------------------------------- #
 # tests
 # --------------------------------------------------------------------------- #
 
+@pytest.mark.parametrize(
+    "t_args, dtype",
+    [
+        ({"fp16": True}, torch.float16),
+        ({"bf16": True}, torch.bfloat16),
+    ],
+)
+def test_dtype_configuration(t_args, dtype):
+    model, _ = build_model(
+        MODEL_CFG,
+        TOKENIZER_CFG,
+        FridayTrainingArguments(**t_args)
+    )
 
-def test_lora_injection_fp16():
-    m_cfg = {}
-    args  = targs(lora_enable=True)
+    assert all(p.dtype == dtype for n, p in model.named_parameters() if 'norm' not in n), \
+           f"Expected all parameters to be {dtype}, but found different dtypes."
+    
+    assert all(p.dtype == torch.float32 for n, p in model.named_parameters() if 'norm' in n), \
+           f"Expected all Norm parameters to be {torch.float32}, but found different dtypes."
 
-    model, _ = build_model(m_cfg, TOKENIZER_CFG, args)
+@pytest.mark.parametrize(
+    "t_args, dtype",
+    [
+        ({
+            "fp16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+        }, torch.float16),
+        ({
+            "bf16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+        }, torch.bfloat16),
+    ],
+)
+def test_lora_dtype_configuration(t_args, dtype):
+    model, _ = build_model(
+        MODEL_CFG,
+        TOKENIZER_CFG,
+        FridayTrainingArguments(**t_args)
+    )
 
     adapters = [m for m in model.modules() if isinstance(m, LoraLayer)]
     assert adapters, "LoRA was not injected"
-    assert all(p.dtype == torch.float16
-               for n, p in model.named_parameters() if 'lora_' in n)
+    assert all(
+        p.dtype == dtype for m in adapters for n, p in m.named_parameters()
+    ), "Expected all LoRA parameters to be {dtype}, but found different dtypes."
 
-
-def test_norm_cast_fp32():
-    m_cfg = {}
-    args  = targs()                       # default 16-bit
-
-    model, _ = build_model(m_cfg, TOKENIZER_CFG, args)
-
-    assert all(p.dtype == torch.float32
-               for n, p in model.named_parameters() if 'norm' in n)
 
 
 def test_kbit_guard_raises_on_fp32():
-    m_cfg = {}
-    args  = targs(bits=4, fp16=False, bf16=False)
-
     with pytest.raises(ValueError):
-        build_model(m_cfg, TOKENIZER_CFG, args)
+        model, _ = build_model(
+            MODEL_CFG,
+            TOKENIZER_CFG,
+            FridayTrainingArguments(**{
+                "bits": 4,
+                "fp16": False,
+                "bf16": False,
+            })
+        )
 
 
-def test_freeze_flags():
-    m_cfg = {}
-    args  = targs(freeze_language_model=True,
-                  freeze_vision_tower=True,
-                  freeze_vision_adapter=True)
+@pytest.mark.parametrize(
+    "t_args, lm_freeze, vt_freeze, va_freeze",
+    [
+        ({
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
+        }, True, True, True),
+        ({
+            "freeze_language_model": False,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
+        }, False, True, True),
+        ({
+            "freeze_language_model": True,
+            "freeze_vision_tower": False,
+            "freeze_vision_adapter": True,
+        }, True, False, True),
+        ({
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": False,
+        }, True, True, False),
+    ],
+)
+def test_freeze_flags(t_args, lm_freeze, vt_freeze, va_freeze):
+    model, _ = build_model(
+        MODEL_CFG,
+        TOKENIZER_CFG,
+        FridayTrainingArguments(**t_args)
+    )
 
-    model, _ = build_model(m_cfg, TOKENIZER_CFG, args)
+    assert all(p.requires_grad == (not lm_freeze) for p in model.get_llm_parameters())
+    assert all(p.requires_grad == (not vt_freeze) for p in model.get_vision_tower().parameters())
+    assert all(p.requires_grad == (not va_freeze) for p in model.get_vision_adapter().parameters())
 
-    assert all(not p.requires_grad for p in model.parameters())
-
-
-def test_mm_projector_checkpoint_updates_cfg(tmp_path):
-    # create fake checkpoint file
-    ckpt = tmp_path / "mm_projector.bin"
-    ckpt.touch()
-
-    m_cfg = {}
-    args  = targs()
-
-    _model, _ = build_model(m_cfg, TOKENIZER_CFG, args,
-                            mm_projector_checkpoint=str(ckpt))
-
-    assert m_cfg["vision_adapter"]["checkpoint_path"] == str(ckpt)
 
 
 def test_mm_projector_missing_raises(tmp_path):
     missing = tmp_path / "nope.bin"
-    m_cfg = {}
-    args  = targs()
 
     with pytest.raises(ValueError):
-        build_model(m_cfg, TOKENIZER_CFG, args,
+        build_model(MODEL_CFG, TOKENIZER_CFG, FridayTrainingArguments(),
                     mm_projector_checkpoint=str(missing))

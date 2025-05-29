@@ -109,7 +109,7 @@ def build_model(
                 module.to(torch.bfloat16)
     
 
-    model.set_llm_requires_grad(not training_args.freeze_language_model)
+    model.set_llm_requires_grad(not training_args.freeze_language_model, exclude_lora=True)
     model.set_vision_tower_requires_grad(not training_args.freeze_vision_tower)
     model.set_vision_adapter_requires_grad(not training_args.freeze_vision_adapter)
 
