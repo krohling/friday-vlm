@@ -30,7 +30,7 @@ def test_tiny_overfit(dataset_type):
     # ───────── build one synthetic batch (you can load a real datum instead) ────────
     if dataset_type == "finetuning":
         print("Testing overfit on finetuning dataset")
-        model.set_language_model_requires_grad(True)
+        model.set_llm_requires_grad(True)
         model.set_vision_tower_requires_grad(False)
         model.set_vision_adapter_requires_grad(False)
         dataset = FinetuningDataset(
@@ -42,7 +42,7 @@ def test_tiny_overfit(dataset_type):
         )
     else:
         print("Testing overfit on pretraining dataset")
-        model.set_language_model_requires_grad(False)
+        model.set_llm_requires_grad(False)
         model.set_vision_tower_requires_grad(False)
         model.set_vision_adapter_requires_grad(True)
         dataset = PretrainingDataset(

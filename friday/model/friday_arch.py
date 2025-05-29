@@ -237,8 +237,15 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def get_llm_parameters(self):
         return [p for n, p in self.named_parameters() if "vision_tower" not in n and "mm_projector" not in n]
 
-    def set_language_model_requires_grad(self, requires_grad: bool):
-        for p in self.get_llm_parameters():
+    def get_llm_named_modules(self):
+        return {n: m for n, m in self.named_modules() if "vision_tower" not in n and "mm_projector" not in n}
+    
+    def set_llm_requires_grad(self, requires_grad: bool, exclude_lora: bool = True):
+        for n, p in self.named_parameters():
+            if exclude_lora and ("lora_A" in n or "lora_B" in n):
+                continue
+            if "vision_tower" in n or "mm_projector" in n:
+                continue
             p.requires_grad = requires_grad
     
     def set_vision_tower_requires_grad(self, requires_grad: bool):
@@ -247,7 +254,7 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def set_vision_adapter_requires_grad(self, requires_grad: bool):
         self.model.set_vision_adapter_requires_grad(requires_grad)
     
-    def set_language_model_dtype(self, dtype: torch.dtype):
+    def set_llm_dtype(self, dtype: torch.dtype):
         for p in self.get_llm_parameters():
             p.data = p.data.to(dtype)
 

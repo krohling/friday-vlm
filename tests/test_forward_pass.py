@@ -116,7 +116,7 @@ def test_cache_position_alignment(friday, monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_gradients_flow_to_adapter_only(friday):
     # Freeze language embeddings & vision tower; keep adapter trainable
-    friday.set_language_model_requires_grad(False)
+    friday.set_llm_requires_grad(False)
     friday.set_vision_tower_requires_grad(False)
     friday.set_vision_adapter_requires_grad(True)
 

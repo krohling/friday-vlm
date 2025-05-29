@@ -11,8 +11,8 @@
         "device_map": "cuda",
         "cfg_vision_tower": {
             "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
-            "s2_scales": "384,768",
-            "type": "siglip",
+            "s2_scales": "512,1024",
+            "type": "fastvit",
             "use_s2": true,
             "pad_to_square": true,
             "model_params": { "device_map": "cuda" }
@@ -34,7 +34,6 @@
         "max_count": 25
     },
     "training": {
-        "bits": 16,
         "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
         "save_only_vision_adapter": true,
