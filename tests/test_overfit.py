@@ -5,7 +5,7 @@ from PIL import Image
 from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
 
 
-STEPS   = 60
+STEPS   = 100
 TARGET  = 0.05
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs GPU")
