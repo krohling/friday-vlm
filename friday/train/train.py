@@ -66,7 +66,8 @@ def train():
     # ------ 1. Build the model and tokenizer ------
     
     model, tokenizer = build_model(
-        config=config,
+        model_config=config.model,
+        tokenizer_config=config.tokenizer,
         training_args=training_args,
         mm_projector_checkpoint=args.mm_projector_checkpoint,
     )
