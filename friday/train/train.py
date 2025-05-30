@@ -9,8 +9,6 @@ import torch
 
 import transformers
 
-from accelerate.utils import is_main_process
-
 from model_factory import build_model
 from friday.model import *
 from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
@@ -21,19 +19,23 @@ from friday.util import (
     get_peft_state_maybe_zero_3
 )
 
+local_rank = None
 def rank0_print(*args):
-    if is_main_process():
+    if local_rank == 0:
         print(*args)
 
 
 def train():
+    global local_rank
 
     parser = argparse.ArgumentParser(description="Example script")
     parser.add_argument('--config', type=str, help='The path to the config json file')
     parser.add_argument('--deepspeed', type=str, help='The path to the deepspeed config json file')
+    parser.add_argument('--local_rank', type=int, help='The local rank for distributed training', default=-1)
     parser.add_argument('--resume_from_checkpoint', type=str, help='The path to the checkpoint to resume from', default=None)
     parser.add_argument('--mm_projector_checkpoint', type=str, help='The checkpoint to load for the vision adapter', default=None)
     args = parser.parse_args()
+    local_rank = args.local_rank
 
     # ------ 0. Load config ------
     if not os.path.exists(args.config):
@@ -41,6 +43,7 @@ def train():
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
     
+    print(f"local_rank: {local_rank}")
     print(config)
 
     assert "tokenizer" in config, "Tokenizer config is required."
@@ -67,9 +70,8 @@ def train():
         training_args=training_args,
         mm_projector_checkpoint=args.mm_projector_checkpoint,
     )
-    if is_main_process():
+    if local_rank in [0, -1]:
         model.print_device_configuration()
-
 
     
     
@@ -130,7 +132,7 @@ def train():
         non_lora_state_dict = get_peft_state_non_lora_maybe_zero_3(
             model.named_parameters()
         )
-        if is_main_process():
+        if local_rank in [0, -1]:
             model.config.save_pretrained(training_args.output_dir)
             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))

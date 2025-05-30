@@ -7,7 +7,9 @@ mkdir datasets
 cd datasets
 git clone https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain
 cd LLaVA-Pretrain
-unzip LLaVA-Pretrain.zip -d images
+unzip images.zip -d images
+rm images.zip
+cd ../..
 
 deepspeed ./friday/train/train.py --config ./config/pretrain.json
 
