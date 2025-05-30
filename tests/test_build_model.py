@@ -42,20 +42,6 @@ TOKENIZER_CFG = {
     "trust_remote_code": True
 }
 
-def targs(**kw):
-    base = dict(
-        fp16                = True,
-        bf16                = False,
-        lora_enable         = False,
-        lora_params         = {"r":4, "lora_alpha":8, "lora_dropout":0.0, "bias":"none"},
-        gradient_checkpointing = False,
-        freeze_language_model   = False,
-        freeze_vision_tower     = False,
-        freeze_vision_adapter   = False,
-        bits_and_bytes_params   = {},
-    )
-    return FridayTrainingArguments(**kw)
-
 # --------------------------------------------------------------------------- #
 # tests
 # --------------------------------------------------------------------------- #
@@ -79,6 +65,8 @@ def test_dtype_configuration(t_args, dtype):
     
     assert all(p.dtype == torch.float32 for n, p in model.named_parameters() if 'norm' in n), \
            f"Expected all Norm parameters to be {torch.float32}, but found different dtypes."
+    
+    assert not any(isinstance(m, LoraLayer) for m in model.modules())
 
 @pytest.mark.parametrize(
     "t_args, dtype",
@@ -107,6 +95,23 @@ def test_lora_dtype_configuration(t_args, dtype):
     assert all(
         p.dtype == dtype for m in adapters for n, p in m.named_parameters()
     ), "Expected all LoRA parameters to be {dtype}, but found different dtypes."
+
+    lm_head_params = [(n,p) for n, p in model.named_parameters() if 'lm_head' in n]
+    assert lm_head_params, "LM head parameters not found"
+    assert all('lora_' not in n for n, p in lm_head_params), \
+           "Expected LM head parameters to not be LoRA parameters, but found LoRA in names."
+    
+    vt_params = [(n,p) for n, p in model.named_parameters() if 'vision_tower' in n]
+    assert vt_params, "Vision Tower parameters not found"
+    assert all('lora_' not in n for n, p in vt_params), \
+           "Expected Vision Tower parameters to not be LoRA parameters, but found LoRA in names."
+    
+    va_params = [(n,p) for n, p in model.named_parameters() if 'mm_projector' in n]
+    assert va_params, "Vision Adapter parameters not found"
+    assert all('lora_' not in n for n, p in va_params), \
+           "Expected Vision Adapter parameters to not be LoRA parameters, but found LoRA in names."
+    
+
 
 
 
@@ -167,3 +172,86 @@ def test_mm_projector_missing_raises(tmp_path):
     with pytest.raises(ValueError):
         build_model(MODEL_CFG, TOKENIZER_CFG, FridayTrainingArguments(),
                     mm_projector_checkpoint=str(missing))
+
+
+
+@pytest.mark.parametrize(
+    "t_args, p_name, lora_dtype",
+    [
+        ({
+            "bits": 4,
+            "bf16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+            "bits_and_bytes_params": {"strict_load": False}
+        }, "4bit", torch.bfloat16),
+        ({
+            "bits": 4,
+            "fp16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+            "bits_and_bytes_params": {"strict_load": False}
+        }, "4bit", torch.float16),
+        # ({
+        #     "bits": 8,
+        #     "bf16": True,
+        #     "lora_enable": True,
+        #     "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+        #     "bits_and_bytes_params": {"strict_load": False}
+        # }, "8bit", torch.bfloat16),
+        # ({
+        #     "bits": 8,
+        #     "fp16": True,
+        #     "lora_enable": True,
+        #     "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+        #     "bits_and_bytes_params": {"strict_load": False}
+        # }, "8bit", torch.float16),
+    ],
+)
+def test_quantization(t_args, p_name, lora_dtype):
+    model, _ = build_model(
+        MODEL_CFG, 
+        TOKENIZER_CFG, 
+        FridayTrainingArguments(**t_args)
+    )
+
+    # -------- check 4-bit weights present --------
+    # print_params = [
+    #     (n,p) for n, p in model.named_parameters() 
+    #     if "vision_tower" not in n and "mm_projector" not in n
+    # ]
+    # for n, p in print_params:
+    #     print(f"{n}: {type(p).__name__}, dtype: {p.dtype}")
+
+    assert all(
+            p_name in type(p).__name__.lower()
+            for n,p in model.named_parameters() if "vision_tower" not in n and "mm_projector" not in n and "lora_" not in n and "norm" not in n and "lm_head" not in n
+        ), "Expected all LLM parameters (except norm and lm_head layers) to be quantized, but found non-quantized types."
+    
+    assert all(
+            p_name not in type(p).__name__.lower()
+            for n,p in model.named_parameters() if "vision_tower" in n
+        ), "Expected all Vision Tower parameters not to be quantized, but found quantized types."
+
+    assert all(
+            p_name not in type(p).__name__.lower()
+            for n,p in model.named_parameters() if "mm_projector" in n
+        ), "Expected all Vision Adapter parameters not to be quantized, but found quantized types."
+    
+    assert all(
+            p_name not in type(p).__name__.lower()
+            for n,p in model.named_parameters() if "norm" in n
+        ), "Expected all norm parameters not to be quantized, but found quantized types."
+    
+    assert all(
+            p_name not in type(p).__name__.lower()
+            for n,p in model.named_parameters() if "lm_head" in n
+        ), "Expected all lm_head parameters not to be quantized, but found quantized types."
+    
+    assert all(
+        p.dtype is lora_dtype
+        for n, p in model.named_parameters() if "lora_" in n
+    )
+
+
+

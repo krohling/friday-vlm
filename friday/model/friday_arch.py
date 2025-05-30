@@ -234,8 +234,11 @@ class FridayForCausalLM(Phi3ForCausalLM):
     def get_vision_adapter(self) -> MLPAdapter:
         return self.model.mm_projector
 
-    def get_llm_parameters(self):
-        return [p for n, p in self.named_parameters() if "vision_tower" not in n and "mm_projector" not in n]
+    def get_llm_parameters(self, exclude_lora: bool = False):
+        return [
+            p for n, p in self.named_parameters() 
+            if "vision_tower" not in n and "mm_projector" not in n and (not exclude_lora or ("lora_" not in n))
+        ]
 
     def get_llm_named_modules(self):
         return {n: m for n, m in self.named_modules() if "vision_tower" not in n and "mm_projector" not in n}
