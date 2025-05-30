@@ -1,9 +1,15 @@
-mkdir datasets
-wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
-unzip LLaVA-Pretrain_small.zip -d datasets
-rm LLaVA-Pretrain_small.zip
+# mkdir datasets
+# wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
+# unzip LLaVA-Pretrain_small.zip -d datasets
+# rm LLaVA-Pretrain_small.zip
 
-deepspeed ./friday/train/train.py --config ./config/test.json
+mkdir datasets
+cd datasets
+git clone https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain
+cd LLaVA-Pretrain
+unzip LLaVA-Pretrain.zip -d images
+
+deepspeed ./friday/train/train.py --config ./config/pretrain.json
 
 echo "***Training Complete***"
 if [ -n "$RUNPOD_POD_ID" ]; then

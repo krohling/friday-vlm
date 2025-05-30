@@ -11,8 +11,9 @@
         "device_map": "cuda",
         "attn_implementation": "flash_attention_2",
         "cfg_vision_tower": {
-            "pretrained_model_name_or_path": "google/siglip2-so400m-patch16-384",
-            "s2_scales": "384,768",
+            "pretrained_model_name_or_path": "kevin510/fast-vit-hd",
+            "type": "fastvit",
+            "s2_scales": "512,1024",
             "use_s2": true,
             "pad_to_square": true,
             "model_params": { "device_map": "cuda" }

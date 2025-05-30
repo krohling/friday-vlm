@@ -41,6 +41,8 @@ def train():
     with open(args.config, 'r') as f:
         config = EasyDict(json.load(f))
     
+    print(config)
+
     assert "tokenizer" in config, "Tokenizer config is required."
     assert "model" in config, "Model config is required."
     assert "data" in config, "Data config is required."
