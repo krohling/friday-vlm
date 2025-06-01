@@ -1,7 +1,4 @@
-# mkdir datasets
-# wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
-# unzip LLaVA-Pretrain_small.zip -d datasets
-# rm LLaVA-Pretrain_small.zip
+#!/bin/bash
 
 mkdir datasets
 cd datasets
@@ -11,7 +8,8 @@ unzip images.zip -d images
 rm images.zip
 cd ../..
 
-deepspeed ./friday/train/train.py --config ./config/pretrain.json
+PYTHONPATH=. deepspeed friday/train/train.py --config ./config/pretrain.json
+
 
 echo "***Training Complete***"
 if [ -n "$RUNPOD_POD_ID" ]; then

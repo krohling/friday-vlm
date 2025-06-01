@@ -1,4 +1,8 @@
-FROM pytorch/pytorch:2.4.1-cuda11.8-cudnn9-runtime
+FROM pytorch/pytorch:2.6.0-cuda12.6-cudnn9-devel
+
+RUN pip install --no-build-isolation \
+    https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiTRUE-cp311-cp311-linux_x86_64.whl
+
 
 RUN apt update && \
     apt install -y \
@@ -6,8 +10,7 @@ RUN apt update && \
         wget \
         unzip \
         git \
-        git-lfs \
-        nvidia-cuda-toolkit
+        git-lfs
     
 
 RUN git lfs install
@@ -19,6 +22,5 @@ RUN pip install -e . --no-build-isolation && \
     pip install wandb
 
 COPY . /opt/ml/friday/
-RUN pip install -e . --no-build-isolation
 
 ENTRYPOINT ["./run.sh"]

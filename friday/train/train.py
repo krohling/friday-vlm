@@ -9,9 +9,9 @@ import torch
 
 import transformers
 
-from model_factory import build_model
 from friday.model import *
 from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
+from friday.train.model_factory import build_model
 from friday.train.friday_trainer import FridayTrainer, zip_and_upload_checkpoint_artifact
 from friday.train.config import FridayTrainingArguments, FridayDataArguments
 from friday.util import (
