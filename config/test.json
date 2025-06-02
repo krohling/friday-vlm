@@ -36,7 +36,7 @@
     "training": {
         "mpt_attn_impl": "triton",
         "group_by_modality_length": false,
-        "save_only_vision_adapter": true,
+        "save_vision_adapter": true,
         "freeze_language_model": true,
         "freeze_vision_tower": true,
         "freeze_vision_adapter": false,

@@ -20,11 +20,18 @@ class FridayTrainingArguments(transformers.TrainingArguments):
     vision_adapter_lr: Optional[float] = None
     mpt_attn_impl: Optional[str] = field(default="triton")
     group_by_modality_length: bool = field(default=False)
-    save_only_vision_adapter: bool = field(
+    save_vision_adapter: bool = field(
         default=False,
         metadata={
             "help":
-                "If true, only save the multimodal projector. This is useful for training the projector separately."
+                "If true save the multimodal projector."
+        },
+    )
+    save_language_model: bool = field(
+        default=False,
+        metadata={
+            "help":
+                "If true save the language model."
         },
     )
     bits: int = field(

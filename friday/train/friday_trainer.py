@@ -164,10 +164,11 @@ class FridayTrainer(Trainer):
 
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        if self.args.save_only_vision_adapter:
+        if self.args.save_vision_adapter:
             if self.args.local_rank == 0 or self.args.local_rank == -1:
                 save_vision_adapter(self.model, output_dir)
-        else:
+        
+        if self.args.save_language_model:
             super(FridayTrainer, self)._save(output_dir, state_dict)
 
 
