@@ -183,42 +183,53 @@ def test_mm_projector_missing_raises(tmp_path):
             "bf16": True,
             "lora_enable": True,
             "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-            "bits_and_bytes_params": {"strict_load": False}
+            "bits_and_bytes_params": {"strict_load": False},
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
         }, "4bit", torch.bfloat16),
         ({
             "bits": 4,
             "fp16": True,
             "lora_enable": True,
             "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-            "bits_and_bytes_params": {"strict_load": False}
+            "bits_and_bytes_params": {"strict_load": False},
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
         }, "4bit", torch.float16),
         ({
             "bits": 8,
             "bf16": True,
             "lora_enable": True,
             "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-            "bits_and_bytes_params": {"strict_load": False}
-        }, "8bit", torch.bfloat16),
+            "bits_and_bytes_params": {"strict_load": False},
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
+        }, "int8", torch.bfloat16),
         ({
             "bits": 8,
             "fp16": True,
             "lora_enable": True,
             "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-            "bits_and_bytes_params": {"strict_load": False}
-        }, "8bit", torch.float16),
+            "bits_and_bytes_params": {"strict_load": False},
+            "freeze_language_model": True,
+            "freeze_vision_tower": True,
+            "freeze_vision_adapter": True,
+        }, "int8", torch.float16),
     ],
 )
-def test_quantization(t_args, p_name, lora_dtype):
+def test_quantization_and_lora_configuration(t_args, p_name, lora_dtype):
     model, _ = build_model(
         MODEL_CFG, 
         TOKENIZER_CFG, 
         FridayTrainingArguments(**t_args)
     )
 
-    # -------- check 4-bit weights present --------
     # print_params = [
     #     (n,p) for n, p in model.named_parameters() 
-    #     if "vision_tower" not in n and "mm_projector" not in n
+    #     if "vision_tower" not in n and "mm_projector" not in n and "lora_" not in n and "norm" not in n and "lm_head" not in n
     # ]
     # for n, p in print_params:
     #     print(f"{n}: {type(p).__name__}, dtype: {p.dtype}")
@@ -228,11 +239,15 @@ def test_quantization(t_args, p_name, lora_dtype):
             for n,p in model.named_parameters() if "vision_tower" not in n and "mm_projector" not in n and "lora_" not in n and "norm" not in n and "lm_head" not in n
         ), "Expected all LLM parameters (except norm and lm_head layers) to be quantized, but found non-quantized types."
 
-    # verify lora parameters have gradients enabled
     assert all(
             p.requires_grad
             for n, p in model.named_parameters() if "lora_" in n
         ), "Expected all LoRA parameters to have requires_grad=True, but found some with requires_grad=False."
+    
+    assert all(
+            not p.requires_grad
+            for n, p in model.named_parameters() if "lora_" not in n
+        ), "Expected all non-LoRA parameters to have requires_grad=False, but found some with requires_grad=True."
     
     assert all(
             p_name not in type(p).__name__.lower()
