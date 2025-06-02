@@ -18,21 +18,16 @@ pip install --force-reinstall torchvision
 pip install wandb
 
 mkdir datasets
-# wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
-# unzip LLaVA-Pretrain_small.zip -d datasets
-# rm LLaVA-Pretrain_small.zip
+wget https://friday-vlm.s3.us-west-2.amazonaws.com/LLaVA-Pretrain_small.zip
+unzip LLaVA-Pretrain_small.zip -d datasets
+rm LLaVA-Pretrain_small.zip
 
 wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k_small.zip
 unzip llava_v1_5_mix665k_small.zip -d datasets
 rm llava_v1_5_mix665k_small.zip
 
-wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k.zip
-unzip llava_v1_5_mix665k.zip -d datasets
-rm llava_v1_5_mix665k.zip
+# wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k.zip
+# unzip llava_v1_5_mix665k.zip -d datasets
+# rm llava_v1_5_mix665k.zip
 
 pytest -s
-
-# wandb login <your_api_key>
-# export WANDB_ENTITY=
-# export WANDB_PROJECT=
-# deepspeed ./friday/train/train.py --config ./friday/train/config/pretrain.json

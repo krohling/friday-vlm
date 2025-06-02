@@ -41,11 +41,10 @@ class FridayTrainer(Trainer):
             return None
 
         if self.args.group_by_modality_length:
-            lengths = self.train_dataset.modality_lengths
             return LengthGroupedSampler(
                 self.args.train_batch_size,
                 world_size=self.args.world_size * self.args.gradient_accumulation_steps,
-                lengths=lengths,
+                lengths=self.train_dataset.sample_lengths,
                 group_by_modality=True,
             )
         else:

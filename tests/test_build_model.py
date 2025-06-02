@@ -6,7 +6,7 @@ from easydict import EasyDict
 
 from peft.tuners.lora import LoraLayer
 from friday.train.config import FridayTrainingArguments
-from friday.train.model_factory import build_model      # adjust import path if needed
+from friday.train.model_factory import build_model
 
 # --------------------------------------------------------------------------- #
 # helpers
