@@ -1,14 +1,11 @@
 #!/bin/bash
 
 mkdir datasets
-cd datasets
-git clone https://huggingface.co/datasets/liuhaotian/LLaVA-Pretrain
-cd LLaVA-Pretrain
-unzip images.zip -d images
-rm images.zip
-cd ../..
+wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k_small.zip
+unzip llava_v1_5_mix665k_small.zip -d datasets
+rm llava_v1_5_mix665k_small.zip
 
-PYTHONPATH=. deepspeed friday/train/train.py --config ./config/pretrain.json
+PYTHONPATH=. deepspeed friday/train/train.py --config ./config/finetune.json
 
 
 echo "***Training Complete***"

@@ -11,15 +11,15 @@
         "device_map": "cuda",
         "attn_implementation": "flash_attention_2",
         "cfg_vision_tower": {
-            "pretrained_model_name_or_path": "google/siglip2-so400m-patch16-512",
-            "type": "siglip",
+            "pretrained_model_name_or_path": "kevin510/fast-vit-hd",
+            "type": "fastvit",
             "s2_scales": "512,1024",
             "use_s2": true,
             "pad_to_square": true,
-            "model_params": { "device_map": "cuda" }
+            "model_params": { "device_map": "cuda", "trust_remote_code": true }
         },
         "cfg_vision_adapter": {
-            "input_dim": 2304,
+            "input_dim": 6144,
             "hidden_dim": 3072,
             "output_dim": 3072,
             "num_layers": 2,
