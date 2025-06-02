@@ -192,20 +192,20 @@ def test_mm_projector_missing_raises(tmp_path):
             "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
             "bits_and_bytes_params": {"strict_load": False}
         }, "4bit", torch.float16),
-        # ({
-        #     "bits": 8,
-        #     "bf16": True,
-        #     "lora_enable": True,
-        #     "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-        #     "bits_and_bytes_params": {"strict_load": False}
-        # }, "8bit", torch.bfloat16),
-        # ({
-        #     "bits": 8,
-        #     "fp16": True,
-        #     "lora_enable": True,
-        #     "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
-        #     "bits_and_bytes_params": {"strict_load": False}
-        # }, "8bit", torch.float16),
+        ({
+            "bits": 8,
+            "bf16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+            "bits_and_bytes_params": {"strict_load": False}
+        }, "8bit", torch.bfloat16),
+        ({
+            "bits": 8,
+            "fp16": True,
+            "lora_enable": True,
+            "lora_params": {"r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "bias": "none"},
+            "bits_and_bytes_params": {"strict_load": False}
+        }, "8bit", torch.float16),
     ],
 )
 def test_quantization(t_args, p_name, lora_dtype):
@@ -227,6 +227,12 @@ def test_quantization(t_args, p_name, lora_dtype):
             p_name in type(p).__name__.lower()
             for n,p in model.named_parameters() if "vision_tower" not in n and "mm_projector" not in n and "lora_" not in n and "norm" not in n and "lm_head" not in n
         ), "Expected all LLM parameters (except norm and lm_head layers) to be quantized, but found non-quantized types."
+
+    # verify lora parameters have gradients enabled
+    assert all(
+            p.requires_grad
+            for n, p in model.named_parameters() if "lora_" in n
+        ), "Expected all LoRA parameters to have requires_grad=True, but found some with requires_grad=False."
     
     assert all(
             p_name not in type(p).__name__.lower()

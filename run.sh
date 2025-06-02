@@ -10,6 +10,7 @@ PYTHONPATH=. deepspeed friday/train/train.py --config ./config/finetune.json
 
 echo "***Training Complete***"
 if [ -n "$RUNPOD_POD_ID" ]; then
+    sleep 60
     echo "Terminating Pod"
     runpodctl remove pod $RUNPOD_POD_ID
 fi

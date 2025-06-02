@@ -31,12 +31,11 @@
     "data": {
         "dataset_type": "finetuning",
         "data_path": "datasets/llava_v1_5_mix665k_small/llava_v1_5_mix665k_small.json",
-        "image_dir": "datasets/llava_v1_5_mix665k_small",
-        "max_count": 250
+        "image_dir": "datasets/llava_v1_5_mix665k_small"
     },
     "training": {
         "mpt_attn_impl": "triton",
-        "group_by_modality_length": false,
+        "group_by_modality_length": true,
         "save_only_vision_adapter": false,
         "freeze_language_model": true,
         "freeze_vision_tower": true,
@@ -64,7 +63,7 @@
         "save_strategy": "steps",
         "save_steps": 24000,
         "save_total_limit": 1,
-        "learning_rate": 5e-4,
+        "learning_rate": 2e-4,
         "weight_decay": 0.0,
         "warmup_ratio": 0.03,
         "lr_scheduler_type": "cosine",

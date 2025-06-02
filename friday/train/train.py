@@ -127,16 +127,25 @@ def train():
 
     # ------ 4. Save model ------
     if training_args.lora_enable:
+        lora_bias = training_args.lora_params.get("bias", "none")
         state_dict = get_peft_state_maybe_zero_3(
-            model.named_parameters(), training_args.lora_bias
+            model.named_parameters(), lora_bias
         )
+
         non_lora_state_dict = get_peft_state_non_lora_maybe_zero_3(
             model.named_parameters()
         )
+
         if local_rank in [0, -1]:
             model.config.save_pretrained(training_args.output_dir)
             model.save_pretrained(training_args.output_dir, state_dict=state_dict)
             torch.save(non_lora_state_dict, os.path.join(training_args.output_dir, 'non_lora_trainables.bin'))
+
+            zip_and_upload_checkpoint_artifact(
+                training_args.output_dir,
+                description="Final checkpoint",
+                metadata={"config": config}
+            )
     else:
         final_checkpoint_path = os.path.join(training_args.output_dir, 'final_checkpoint')
         trainer._save(output_dir=final_checkpoint_path)
