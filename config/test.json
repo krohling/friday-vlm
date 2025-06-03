@@ -32,7 +32,7 @@
         "dataset_type": "finetuning",
         "data_path": "datasets/llava_v1_5_mix665k/llava_v1_5_mix665k_filtered.json",
         "image_dir": "datasets/llava_v1_5_mix665k",
-        "max_count": 1000
+        "max_count": 100
     },
     "training": {
         "mpt_attn_impl": "triton",
@@ -62,9 +62,9 @@
         "output_dir": "./checkpoints-finetune/friday",
         "num_train_epochs": 1,
         "per_device_train_batch_size": 2,
-        "gradient_accumulation_steps": 4,
+        "gradient_accumulation_steps": 1,
         "save_strategy": "steps",
-        "save_steps": 5,
+        "save_steps": 26,
         "save_total_limit": 1,
         "learning_rate": 2e-4,
         "weight_decay": 0.0,

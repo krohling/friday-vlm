@@ -171,7 +171,7 @@ class FridayTrainer(Trainer):
         
         if self.args.save_language_model:
             print("Saving language model...")
-            super(FridayTrainer, self)._save(output_dir, state_dict)
+            self.model.save_pretrained(output_dir + "/lora", safe_serialization=True)
 
 
     

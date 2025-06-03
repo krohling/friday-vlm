@@ -9,14 +9,16 @@ from friday.train.model_factory import build_model
 
 from peft import PeftModel, PeftConfig
 
-VISION_ADAPTER_PATH = "checkpoints-finetune/friday/checkpoint-10/mm_projector.bin"
-LORA_ADAPTER_PATH = "checkpoints-finetune/friday/checkpoint-10"
+CHECKPOINT_PATH = "checkpoints-finetune/friday/final_checkpoint"
+VISION_ADAPTER_PATH = f"{CHECKPOINT_PATH}/mm_projector.bin"
+LORA_ADAPTER_PATH = f"{CHECKPOINT_PATH}/lora"
 
 example_count = 2
 
 with open("./config/finetune.json", 'r') as f:
     config = json.load(f)
 
+config['training']['lora_enable'] = False
 config['model']['cfg_vision_adapter']['checkpoint_path'] = VISION_ADAPTER_PATH
 model, tokenizer = build_model(
     config['model'],
