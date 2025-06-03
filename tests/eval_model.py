@@ -7,26 +7,31 @@ from friday.train.config import FridayTrainingArguments
 from friday.data import PretrainingDataset, FinetuningDataset, FridayCollator
 from friday.train.model_factory import build_model
 
+from peft import PeftModel, PeftConfig
+
+VISION_ADAPTER_PATH = "checkpoints-finetune/friday/checkpoint-10/mm_projector.bin"
+LORA_ADAPTER_PATH = "checkpoints-finetune/friday/checkpoint-10"
+
 example_count = 2
 
 with open("./config/finetune.json", 'r') as f:
     config = json.load(f)
 
-# del config['model']['attn_implementation']
+config['model']['cfg_vision_adapter']['checkpoint_path'] = VISION_ADAPTER_PATH
 model, tokenizer = build_model(
     config['model'],
     config['tokenizer'],
     FridayTrainingArguments(**config['training']),
 )
-collator = FridayCollator(tokenizer=tokenizer)
-
+model = PeftModel.from_pretrained(model, LORA_ADAPTER_PATH, is_trainable=False)
 model.print_device_configuration()
 model.to(device=model.device, dtype=torch.bfloat16)
 model.eval()
 
-dataset = PretrainingDataset(
-    data_path="datasets/LLaVA-Pretrain_small/blip_laion_cc_sbu_558k_meta_small.json",
-    image_dir="datasets/LLaVA-Pretrain_small/images",
+collator = FridayCollator(tokenizer=tokenizer)
+dataset = FinetuningDataset(
+    data_path="datasets/llava_v1_5_mix665k/llava_v1_5_mix665k_filtered.json",
+    image_dir="datasets/llava_v1_5_mix665k/",
     tokenizer=tokenizer,
     vision_tower=model.get_vision_tower(),
 )

@@ -66,7 +66,7 @@ class FridayTrainer(Trainer):
             decay_parameters = get_parameter_names(opt_model, ALL_LAYERNORM_LAYERS)
             decay_parameters = [name for name in decay_parameters if "bias" not in name]
             if self.args.vision_adapter_lr is not None:
-                projector_parameters = [name for name, _ in opt_model.get_vision_adapter().parameters() if "mm_projector" in name or "vision_tower" in name]
+                projector_parameters = [name for name, _ in opt_model.named_parameters() if "mm_projector" in name or "vision_tower" in name]
                 optimizer_grouped_parameters = [
                     {
                         "params": [
@@ -166,9 +166,11 @@ class FridayTrainer(Trainer):
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         if self.args.save_vision_adapter:
             if self.args.local_rank == 0 or self.args.local_rank == -1:
+                print("Saving vision adapter...")
                 save_vision_adapter(self.model, output_dir)
         
         if self.args.save_language_model:
+            print("Saving language model...")
             super(FridayTrainer, self)._save(output_dir, state_dict)
 
 
