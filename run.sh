@@ -1,11 +1,25 @@
 #!/bin/bash
 
 mkdir datasets
-wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k_small.zip
-unzip llava_v1_5_mix665k_small.zip -d datasets
-rm llava_v1_5_mix665k_small.zip
+
+
+
+
+# wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k_small.zip
+# unzip llava_v1_5_mix665k_small.zip -d datasets
+# rm llava_v1_5_mix665k_small.zip
+
+# PYTHONPATH=. deepspeed friday/train/train.py --config ./config/test.json
+
+
+
+wget https://friday-vlm.s3.us-west-2.amazonaws.com/llava_v1_5_mix665k.zip
+unzip llava_v1_5_mix665k.zip -d datasets
+rm llava_v1_5_mix665k.zip
 
 PYTHONPATH=. deepspeed friday/train/train.py --config ./config/finetune.json
+
+
 
 
 echo "***Training Complete***"
