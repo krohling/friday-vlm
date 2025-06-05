@@ -43,10 +43,10 @@ def build_model(
     # ------ 2. Load model, tokenizer, and vision tower ------
     if mm_projector_checkpoint is not None:
         if os.path.exists(mm_projector_checkpoint):
-            if "vision_adapter" in model_config:
-                model_config["vision_adapter"]["checkpoint_path"] = mm_projector_checkpoint
+            if "cfg_vision_adapter" in model_config:
+                model_config["cfg_vision_adapter"]["checkpoint_path"] = mm_projector_checkpoint
             else:
-                model_config["vision_adapter"] = dict(checkpoint_path=mm_projector_checkpoint)
+                model_config["cfg_vision_adapter"] = dict(checkpoint_path=mm_projector_checkpoint)
         else:
             raise ValueError(f"MM Projector checkpoint {mm_projector_checkpoint} does not exist.")
 
