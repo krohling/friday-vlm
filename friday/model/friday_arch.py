@@ -57,7 +57,7 @@ DEFAULT_CFG_VISION_ADAPTER = {
 
 
 class FridayConfig(Phi3Config):
-    model_type = "friday-phi"
+    model_type = "friday"
 
     def __init__(self, 
             base_model_name_or_path: str | None = "microsoft/Phi-4-mini-reasoning",
@@ -583,6 +583,3 @@ def build_tokenizer(base_model_id: str) -> Tuple[AutoTokenizer, dict]:
         }
     return tok, specials
 
-
-AutoConfig.register("friday-phi", FridayConfig)
-AutoModelForCausalLM.register(FridayConfig, FridayForCausalLM)

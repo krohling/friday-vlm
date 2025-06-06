@@ -100,7 +100,7 @@ def test_instantiate_from_pretrained():
 
 def test_instantiate_with_auto_config():
     """Instantiate the model and confirm that frozen parameters have requires_grad disabled."""
-    cfg = AutoConfig.for_model("friday-phi")
+    cfg = AutoConfig.for_model("friday")
     model = AutoModelForCausalLM.from_config(cfg)
     model.initialize_vision_modules()
     
@@ -128,7 +128,7 @@ def test_auto_registry(monkeypatch):
     monkeypatch.setattr(FridayForCausalLM, "__init__", _lightweight_init, raising=True)
 
     # --- AutoConfig should instantiate the correct config class ------------ #
-    cfg = AutoConfig.for_model("friday-phi")
+    cfg = AutoConfig.for_model("friday")
     assert isinstance(cfg, FridayConfig)
 
     # --- AutoModelForCausalLM should return the Friday model class --------- #
