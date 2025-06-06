@@ -38,16 +38,17 @@ DEFAULT_CFG_SPECIAL_TOKENS = {
     "image_end_token_id": 200031,
 }
 DEFAULT_CFG_VISION_TOWER = {
-    "pretrained_model_name_or_path": "google/siglip2-base-patch16-384",
-    "type": "siglip",
-    "s2_scales": "384,768",
+    "pretrained_model_name_or_path": "kevin510/fast-vit-hd",
+    "type": "fastvit",
+    "s2_scales": "512,1024",
     "use_s2": True,
     "pad_to_square": True,
     "freeze": False,
+    "model_params": { "device_map": "cuda", "trust_remote_code": True }
 }
 DEFAULT_CFG_VISION_ADAPTER = {
-    "input_dim": 1536,
-    "hidden_dim": 512,
+    "input_dim": 6144,
+    "hidden_dim": 3072,
     "output_dim": 3072,
     "layers": 2,
     "activation": "gelu",
@@ -59,8 +60,8 @@ class FridayConfig(Phi3Config):
     model_type = "friday-phi"
 
     def __init__(self, 
-            base_model_name_or_path: str | None = "microsoft/Phi-4-mini-instruct",
-            delay_load=True, 
+            base_model_name_or_path: str | None = "microsoft/Phi-4-mini-reasoning",
+            delay_load=False, 
             tokenizer_model_max_length=None,
             **kwargs
         ):
@@ -160,8 +161,11 @@ class FridayModel(Phi3Model):
         self.vision_tower.load_model()
         self.mm_projector = MLPAdapter(**self.cfg_vision_adapter)
 
-        self.set_vision_tower_requires_grad(not self.cfg_vision_tower["freeze"])
-        self.set_vision_adapter_requires_grad(not self.cfg_vision_adapter["freeze"])
+        if self.cfg_vision_tower.get("freeze", False):
+            self.set_vision_tower_requires_grad(False)
+        
+        if self.cfg_vision_adapter.get("freeze", False):
+            self.set_vision_adapter_requires_grad(False)
     
     def compute_image_features(self, imgs: torch.Tensor) -> torch.Tensor:
         features = self.vision_tower(imgs)
